@@ -1,0 +1,57 @@
+:root {
+  font-family: var(--dashora-font);
+  background: radial-gradient(circle at top left, #d9e7ef 0%, var(--dashora-bg) 45%);
+  color: var(--dashora-fg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    background: radial-gradient(circle at top left, #1a2732 0%, var(--dashora-bg) 50%);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.panel {
+  max-width: 40rem;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--dashora-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  line-height: 1.15;
+}
+
+.lede {
+  margin: 0;
+  color: var(--dashora-muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+}

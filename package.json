@@ -1,0 +1,31 @@
+{
+  "name": "dashora",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dashora — a self-hosted personal dashboard",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "build:packages": "pnpm -r --filter @dashora/shared --filter @dashora/widget-sdk --filter @dashora/ui run build",
+    "dev": "pnpm run build:packages && pnpm -r --parallel --filter @dashora/web --filter @dashora/server run dev",
+    "build": "pnpm run build:packages && pnpm -r --filter @dashora/server --filter @dashora/web run build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm run build:packages && pnpm -r run typecheck",
+    "test": "pnpm run build:packages && pnpm -r --filter @dashora/shared --filter @dashora/widget-sdk --filter @dashora/ui --filter @dashora/server --filter @dashora/web run test",
+    "test:e2e": "pnpm --filter @dashora/web run test:e2e",
+    "clean": "pnpm -r run clean"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}

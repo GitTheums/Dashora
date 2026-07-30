@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Dependencies & local env
+node_modules
+.pnpm-store
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build artifacts & caches
+**/dist
+**/coverage
+**/.vite
+**/.turbo
+**/*.tsbuildinfo
+**/playwright-report
+**/test-results
+
+# Docs & IDE (not needed in runtime images)
+docs
+.cursor
+.vscode
+*.md
+!README.md
+
+# Tests
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/vitest.config.ts
+**/playwright.config.ts
+
+# Misc
+.DS_Store
+Thumbs.db
+tmp
+temp

@@ -1,0 +1,10 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  "@biomejs/biome": true
+  esbuild: true
+
+autoInstallPeers: true
+strictPeerDependencies: false
