@@ -188,6 +188,14 @@ export function TopNav({
           window.location.href = "/design-system";
         },
       },
+      {
+        id: "provider-diagnostics",
+        label: "Provider diagnostics",
+        group: "Administration",
+        onSelect: () => {
+          window.location.href = "/admin/providers";
+        },
+      },
     ],
     [editMode, onCreatePage, onEditModeChange, onPageChange, pages, resolved, toggle],
   );

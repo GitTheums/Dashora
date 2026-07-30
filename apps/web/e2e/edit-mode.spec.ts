@@ -270,7 +270,8 @@ test("view mode hides edit controls; edit mode restores them and persists layout
     return;
   }
 
-  const handle = widget.locator(".layout-placeholder__drag-handle");
+  const handle = widget.locator(".dashora-widget-drag-handle");
+  await expect(handle).toHaveClass(/dashora-widget-drag-handle/);
   const handleBox = await handle.boundingBox();
   expect(handleBox).not.toBeNull();
   if (!handleBox) {
@@ -300,10 +301,136 @@ test("view mode hides edit controls; edit mode restores them and persists layout
   }
   expect(Math.abs(afterDrag.left - original.left)).toBeGreaterThan(40);
   expect(Math.abs(afterDrag.top - original.top)).toBeGreaterThan(40);
+
+  // Ensure it does not snap back after release (compaction may nudge slightly).
+  await page.waitForTimeout(150);
+  const settled = await widget.evaluate((el) => {
+    const item = el.closest(".dash-layout__item") as HTMLElement | null;
+    if (!item) {
+      return null;
+    }
+    const rect = item.getBoundingClientRect();
+    return { top: rect.top, left: rect.left };
+  });
+  expect(settled).not.toBeNull();
+  if (!settled) {
+    return;
+  }
+  expect(Math.abs(settled.left - original.left)).toBeGreaterThan(40);
+  expect(Math.abs(settled.top - original.top)).toBeGreaterThan(40);
+  expect(Math.abs(settled.left - afterDrag.left)).toBeLessThan(
+    Math.abs(afterDrag.left - original.left) * 0.5,
+  );
+  expect(Math.abs(settled.top - afterDrag.top)).toBeLessThan(
+    Math.abs(afterDrag.top - original.top) * 0.5,
+  );
+
   await expect(page.getByText(/Layout saved|Unsaved changes|Saving/i)).toBeVisible({
     timeout: 5_000,
   });
   await expect(page.getByText("Layout saved")).toBeVisible({ timeout: 5_000 });
+
+  // Resize still works after restoring drag.
+  const item = page.locator(`.dash-layout__item:has([data-widget-id="${WEATHER_ID}"])`);
+  const beforeResize = await item.boundingBox();
+  expect(beforeResize).not.toBeNull();
+  if (!beforeResize) {
+    return;
+  }
+  const resizeHandle = item.locator(".react-resizable-handle-se");
+  await expect(resizeHandle).toBeVisible();
+  const resizeBox = await resizeHandle.boundingBox();
+  expect(resizeBox).not.toBeNull();
+  if (!resizeBox) {
+    return;
+  }
+  await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    resizeBox.x + resizeBox.width / 2 + 90,
+    resizeBox.y + resizeBox.height / 2 + 70,
+    { steps: 12 },
+  );
+  await page.mouse.up();
+  const afterResize = await item.boundingBox();
+  expect(afterResize).not.toBeNull();
+  if (!afterResize) {
+    return;
+  }
+  expect(afterResize.width).toBeGreaterThan(beforeResize.width + 16);
+  expect(afterResize.height).toBeGreaterThan(beforeResize.height + 8);
+  await expect(page.getByText("Layout saved")).toBeVisible({ timeout: 5_000 });
+
+  // Interactive chrome must not move the widget.
+  const beforeRefresh = await widget.evaluate((el) => {
+    const layoutItem = el.closest(".dash-layout__item") as HTMLElement | null;
+    if (!layoutItem) {
+      return null;
+    }
+    const rect = layoutItem.getBoundingClientRect();
+    return { top: rect.top, left: rect.left };
+  });
+  expect(beforeRefresh).not.toBeNull();
+  if (!beforeRefresh) {
+    return;
+  }
+  await page.getByRole("button", { name: /Refresh Weather/i }).click();
+  const afterRefresh = await widget.evaluate((el) => {
+    const layoutItem = el.closest(".dash-layout__item") as HTMLElement | null;
+    if (!layoutItem) {
+      return null;
+    }
+    const rect = layoutItem.getBoundingClientRect();
+    return { top: rect.top, left: rect.left };
+  });
+  expect(afterRefresh).not.toBeNull();
+  if (!afterRefresh) {
+    return;
+  }
+  expect(Math.abs(afterRefresh.left - beforeRefresh.left)).toBeLessThan(2);
+  expect(Math.abs(afterRefresh.top - beforeRefresh.top)).toBeLessThan(2);
+
+  // Feed / content interaction must not start a drag.
+  const feed = page.locator(`[data-widget-id="a1111111-1111-4111-8111-111111111105"]`);
+  await expect(feed).toBeVisible();
+  const feedBefore = await feed.evaluate((el) => {
+    const layoutItem = el.closest(".dash-layout__item") as HTMLElement | null;
+    if (!layoutItem) {
+      return null;
+    }
+    const rect = layoutItem.getBoundingClientRect();
+    return { top: rect.top, left: rect.left };
+  });
+  expect(feedBefore).not.toBeNull();
+  if (!feedBefore) {
+    return;
+  }
+  const feedBody = feed.locator(".widget-instance__body");
+  const feedBodyBox = await feedBody.boundingBox();
+  expect(feedBodyBox).not.toBeNull();
+  if (!feedBodyBox) {
+    return;
+  }
+  await page.mouse.move(feedBodyBox.x + feedBodyBox.width / 2, feedBodyBox.y + 12);
+  await page.mouse.down();
+  await page.mouse.move(feedBodyBox.x + feedBodyBox.width / 2 + 120, feedBodyBox.y + 100, {
+    steps: 10,
+  });
+  await page.mouse.up();
+  const feedAfter = await feed.evaluate((el) => {
+    const layoutItem = el.closest(".dash-layout__item") as HTMLElement | null;
+    if (!layoutItem) {
+      return null;
+    }
+    const rect = layoutItem.getBoundingClientRect();
+    return { top: rect.top, left: rect.left };
+  });
+  expect(feedAfter).not.toBeNull();
+  if (!feedAfter) {
+    return;
+  }
+  expect(Math.abs(feedAfter.left - feedBefore.left)).toBeLessThan(4);
+  expect(Math.abs(feedAfter.top - feedBefore.top)).toBeLessThan(4);
 
   await page.getByRole("button", { name: "Finish editing dashboard" }).click();
   await expect(page.getByRole("button", { name: "Add widget" })).toHaveCount(0);
@@ -319,11 +446,11 @@ test("view mode hides edit controls; edit mode restores them and persists layout
   const reloaded = page.locator(`[data-widget-id="${WEATHER_ID}"]`);
   await expect(reloaded).toBeVisible();
   const afterReload = await reloaded.evaluate((el) => {
-    const item = el.closest(".dash-layout__item") as HTMLElement | null;
-    if (!item) {
+    const layoutItem = el.closest(".dash-layout__item") as HTMLElement | null;
+    if (!layoutItem) {
       return null;
     }
-    const rect = item.getBoundingClientRect();
+    const rect = layoutItem.getBoundingClientRect();
     return { top: rect.top, left: rect.left };
   });
   expect(afterReload).not.toBeNull();

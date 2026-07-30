@@ -17,19 +17,7 @@ import { MoreIcon, RefreshIcon } from "../icons.js";
 import { type WidgetCatalogEntry, catalogEntryForInstance } from "../widget-library/catalog.js";
 import { getWidgetDefinition, getWidgetRenderer } from "./registry.js";
 import { resolveTypedWidgetPayload } from "./resolve-payload.js";
-
-function GripIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-      <circle cx="4" cy="3.5" r="1.1" fill="currentColor" />
-      <circle cx="10" cy="3.5" r="1.1" fill="currentColor" />
-      <circle cx="4" cy="7" r="1.1" fill="currentColor" />
-      <circle cx="10" cy="7" r="1.1" fill="currentColor" />
-      <circle cx="4" cy="10.5" r="1.1" fill="currentColor" />
-      <circle cx="10" cy="10.5" r="1.1" fill="currentColor" />
-    </svg>
-  );
-}
+import { WidgetDragHandle } from "./widget-drag-handle.js";
 
 function formatLastUpdated(value: number | null | undefined): string | null {
   if (value === null || value === undefined) {
@@ -148,17 +136,7 @@ export function WidgetInstanceCard({
       onClick={editMode ? onSelect : undefined}
       onKeyDown={onKeyDown}
     >
-      {editMode ? (
-        <button
-          type="button"
-          className="layout-placeholder__drag-handle widget-instance__drag-handle"
-          tabIndex={-1}
-          aria-label={`Drag ${widget.title}`}
-          title="Drag to move"
-        >
-          <GripIcon />
-        </button>
-      ) : null}
+      {editMode ? <WidgetDragHandle title={widget.title} /> : null}
 
       <header className="widget-instance__header">
         <div className="widget-instance__heading">
@@ -168,7 +146,7 @@ export function WidgetInstanceCard({
             {configurationRequired ? <Badge tone="warning">Setup</Badge> : null}
           </div>
         </div>
-        <div className="widget-instance__actions">
+        <div className="widget-instance__actions" data-grid-drag-cancel>
           {supportsRefresh ? (
             <IconButton
               label={`Refresh ${widget.title}`}
@@ -211,7 +189,7 @@ export function WidgetInstanceCard({
         </div>
       </header>
 
-      <div className="widget-instance__body">
+      <div className="widget-instance__body" data-grid-drag-cancel>
         {!widget.enabled ? (
           <EmptyState
             title="Widget disabled"

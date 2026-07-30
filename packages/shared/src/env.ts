@@ -67,6 +67,54 @@ export function createServerEnvSchema(defaults: { version: string }) {
       .int()
       .positive()
       .default(15 * 60 * 1000),
+    /** Outbound User-Agent for provider HTTP requests. */
+    PROVIDER_USER_AGENT: z
+      .string()
+      .min(1)
+      .default(`Dashora/${defaults.version} (+https://github.com/dashora/dashora)`),
+    /** Time allowed to establish a TCP/TLS connection, in milliseconds. */
+    PROVIDER_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+    /** Total outbound request budget (including body read), in milliseconds. */
+    PROVIDER_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
+    /** Maximum accepted upstream response body size in bytes. */
+    PROVIDER_MAX_RESPONSE_BYTES: z.coerce.number().int().positive().default(2_000_000),
+    /** Maximum number of HTTP redirects to follow for provider requests. */
+    PROVIDER_MAX_REDIRECTS: z.coerce.number().int().min(0).max(20).default(5),
+    /** Default max requests per provider within the rate-limit window. */
+    PROVIDER_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
+    /** Provider rate-limit window in milliseconds. Default 1 minute. */
+    PROVIDER_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+    /** Consecutive failures before opening a provider circuit. */
+    PROVIDER_CIRCUIT_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(5),
+    /** How long a provider circuit stays open, in milliseconds. */
+    PROVIDER_CIRCUIT_OPEN_MS: z.coerce.number().int().positive().default(30_000),
+    /** Default cache TTL for provider HTTP responses, in seconds. */
+    PROVIDER_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(86_400).default(60),
+    /** Default stale-while-revalidate window for provider HTTP responses, in seconds. */
+    PROVIDER_CACHE_SWR_SECONDS: z.coerce.number().int().min(0).max(86_400).default(300),
+    /**
+     * Optional 32-byte key as 64 hex characters for encrypting integration secrets at rest.
+     * Required to store GitHub PATs via the integrations API.
+     */
+    SECRETS_ENCRYPTION_KEY: z
+      .string()
+      .regex(/^[0-9a-fA-F]{64}$/, "SECRETS_ENCRYPTION_KEY must be 64 hex characters")
+      .optional(),
+    /**
+     * Optional GitHub personal access token used when a widget has no linked credential.
+     * Never exposed to the browser.
+     */
+    GITHUB_TOKEN: z.string().trim().min(1).max(256).optional(),
+    /**
+     * Optional CoinGecko Demo/Pro API key for the Markets crypto adapter.
+     * Never exposed to the browser.
+     */
+    COINGECKO_API_KEY: z.string().trim().min(1).max(256).optional(),
+    /**
+     * Optional Finnhub API key for the Markets equities/indexes adapter.
+     * Never exposed to the browser.
+     */
+    FINNHUB_API_KEY: z.string().trim().min(1).max(256).optional(),
   });
 }
 

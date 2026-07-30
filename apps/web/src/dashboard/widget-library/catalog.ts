@@ -24,10 +24,31 @@ import {
   bookmarksDefinition,
 } from "@dashora/widget-sdk/widgets/bookmarks";
 import {
+  CALENDAR_DEFAULT_CONFIG,
+  CALENDAR_WIDGET_ID,
+  calendarDefinition,
+} from "@dashora/widget-sdk/widgets/calendar";
+import {
   CLOCK_DEFAULT_CONFIG,
   CLOCK_WIDGET_ID,
   clockDefinition,
 } from "@dashora/widget-sdk/widgets/clock";
+import {
+  GITHUB_RELEASES_DEFAULT_CONFIG,
+  GITHUB_RELEASES_WIDGET_ID,
+  githubReleasesDefinition,
+} from "@dashora/widget-sdk/widgets/github-releases";
+import {
+  GITHUB_REPOSITORY_DEFAULT_CONFIG,
+  GITHUB_REPOSITORY_WIDGET_ID,
+  githubRepositoryDefinition,
+} from "@dashora/widget-sdk/widgets/github-repository";
+import {
+  MARKETS_DEFAULT_CONFIG,
+  MARKETS_WIDGET_ID,
+  marketsDefinition,
+} from "@dashora/widget-sdk/widgets/markets";
+import { RSS_DEFAULT_CONFIG, RSS_WIDGET_ID, rssDefinition } from "@dashora/widget-sdk/widgets/rss";
 import {
   SEARCH_DEFAULT_CONFIG,
   SEARCH_WIDGET_ID,
@@ -39,11 +60,22 @@ import {
   todoDefinition,
 } from "@dashora/widget-sdk/widgets/todo";
 import {
+  WEATHER_DEFAULT_CONFIG,
+  WEATHER_WIDGET_ID,
+  weatherDefinition,
+} from "@dashora/widget-sdk/widgets/weather";
+import {
   bookmarksMetadata,
+  calendarMetadata,
   clockMetadata,
   demoMetricsMetadata,
+  githubReleasesMetadata,
+  githubRepositoryMetadata,
+  marketsMetadata,
+  rssMetadata,
   searchMetadata,
   todoMetadata,
+  weatherMetadata,
 } from "../widgets/registry.js";
 
 export type CatalogEntryKind = "widget" | "placeholder";
@@ -173,21 +205,9 @@ function catalogFromDefinition(
 }
 
 const PLACEHOLDER_ENTRIES: WidgetCatalogEntry[] = [
-  placeholderEntry("weather", "Weather", "Local conditions placeholder", "home", "accent"),
-  placeholderEntry(
-    "calendar",
-    "Calendar",
-    "Upcoming events placeholder",
-    "productivity",
-    "default",
-  ),
-  placeholderEntry("markets", "Markets", "Ticker placeholder", "finance", "default"),
   placeholderEntry("services", "Services", "Health checks placeholder", "network", "muted", {
     requiresIntegration: true,
     requiresConfigurationOnAdd: true,
-  }),
-  placeholderEntry("feed", "Feed", "Headlines placeholder", "media", "default", {
-    layout: { colSpan: 6, rowSpan: 3, minColSpan: 3, maxColSpan: 12, maxRowSpan: 6 },
   }),
   placeholderEntry("notes", "Notes", "Scratch pad placeholder", "productivity", "muted"),
   placeholderEntry("status", "Status", "System status placeholder", "network", "accent", {
@@ -212,6 +232,48 @@ const PRODUCTION_ENTRIES: WidgetCatalogEntry[] = [
     true,
   ),
   catalogFromDefinition(todoDefinition, todoMetadata, TODO_DEFAULT_CONFIG, "Local task list"),
+  catalogFromDefinition(
+    weatherDefinition,
+    weatherMetadata,
+    WEATHER_DEFAULT_CONFIG,
+    "Local conditions and forecasts",
+    true,
+  ),
+  catalogFromDefinition(
+    rssDefinition,
+    rssMetadata,
+    RSS_DEFAULT_CONFIG,
+    "RSS and Atom headlines",
+    true,
+  ),
+  catalogFromDefinition(
+    calendarDefinition,
+    calendarMetadata,
+    CALENDAR_DEFAULT_CONFIG,
+    "ICS calendar feeds",
+    true,
+  ),
+  catalogFromDefinition(
+    githubRepositoryDefinition,
+    githubRepositoryMetadata,
+    GITHUB_REPOSITORY_DEFAULT_CONFIG,
+    "Repository stats and activity",
+    true,
+  ),
+  catalogFromDefinition(
+    githubReleasesDefinition,
+    githubReleasesMetadata,
+    GITHUB_RELEASES_DEFAULT_CONFIG,
+    "Latest releases across repositories",
+    true,
+  ),
+  catalogFromDefinition(
+    marketsDefinition,
+    marketsMetadata,
+    MARKETS_DEFAULT_CONFIG,
+    "Crypto, equities, and index watchlist",
+    true,
+  ),
 ];
 
 const DEMO_ENTRY: WidgetCatalogEntry = catalogFromDefinition(
@@ -338,5 +400,11 @@ export {
   CLOCK_WIDGET_ID,
   BOOKMARKS_WIDGET_ID,
   TODO_WIDGET_ID,
+  WEATHER_WIDGET_ID,
+  RSS_WIDGET_ID,
+  CALENDAR_WIDGET_ID,
+  GITHUB_REPOSITORY_WIDGET_ID,
+  GITHUB_RELEASES_WIDGET_ID,
+  MARKETS_WIDGET_ID,
   DEMO_METRICS_WIDGET_ID,
 };

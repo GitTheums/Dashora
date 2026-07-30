@@ -47,6 +47,10 @@ import {
   resetWidgetConfig,
 } from "../widget-settings/widget-settings-drawer.js";
 import { WidgetInstanceCard } from "../widgets/instance-card.js";
+import {
+  DASHORA_WIDGET_DRAG_CANCEL_SELECTOR,
+  DASHORA_WIDGET_DRAG_HANDLE_SELECTOR,
+} from "./drag-config.js";
 
 export type LayoutApi = {
   getPageLayout: (pageId: string) => Promise<PageLayoutResponse>;
@@ -833,9 +837,8 @@ export function DashboardLayoutEngine({ pageId, api }: DashboardLayoutEngineProp
             containerPadding={[0, 0]}
             dragConfig={{
               enabled: editMode,
-              handle: ".layout-placeholder__drag-handle",
-              cancel:
-                "a,button,input,textarea,select,.todo-widget,.todo-task,.todo-task__actions,.widget-instance__actions button,[role='menu'],[role='menuitem']",
+              handle: DASHORA_WIDGET_DRAG_HANDLE_SELECTOR,
+              cancel: DASHORA_WIDGET_DRAG_CANCEL_SELECTOR,
             }}
             resizeConfig={{
               enabled: editMode,

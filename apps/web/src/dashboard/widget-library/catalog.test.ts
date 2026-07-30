@@ -14,9 +14,17 @@ describe("widget catalog", () => {
     expect(WIDGET_CATALOG.some((entry) => entry.id === "clock")).toBe(true);
     expect(WIDGET_CATALOG.some((entry) => entry.id === "bookmarks")).toBe(true);
     expect(WIDGET_CATALOG.some((entry) => entry.id === "todo")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "weather")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "rss")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "calendar")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "github-repository")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "github-releases")).toBe(true);
     expect(WIDGET_CATALOG.some((entry) => entry.id === "demo-metrics")).toBe(true);
     expect(WIDGET_CATALOG.some((entry) => entry.kind === "placeholder")).toBe(true);
     expect(WIDGET_CATALOG.some((entry) => entry.id === "placeholder:bookmarks")).toBe(false);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "placeholder:weather")).toBe(false);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "placeholder:calendar")).toBe(false);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "placeholder:feed")).toBe(false);
   });
 
   it("filters by query and category", () => {
@@ -41,14 +49,14 @@ describe("widget catalog", () => {
       expect(typed.config).toMatchObject({ metricLabel: "Active sessions" });
     }
 
-    const weather = getCatalogEntry("placeholder:weather");
+    const weather = getCatalogEntry("weather");
     expect(weather).toBeTruthy();
     if (!weather) {
       return;
     }
-    const placeholder = createInstanceFromCatalog(weather, "b1111111-1111-4111-8111-111111111202");
-    expect(placeholder.kind).toBe("placeholder");
-    expect(shouldOpenSettingsAfterAdd(weather)).toBe(false);
+    const typedWeather = createInstanceFromCatalog(weather, "b1111111-1111-4111-8111-111111111202");
+    expect(typedWeather.kind).toBe("widget");
+    expect(shouldOpenSettingsAfterAdd(weather)).toBe(true);
   });
 
   it("opens settings after add when integration is required", () => {

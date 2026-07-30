@@ -1,33 +1,30 @@
-import {
-  createWidgetDataResponse,
-  createWidgetServerRegistry,
-  toServerRegistration,
-  widgetDataResponseSchema,
-} from "@dashora/widget-sdk";
-import {
-  demoMetricsDefinition,
-  demoMetricsProvider,
-} from "@dashora/widget-sdk/examples/demo-metrics/server";
-import {
-  bookmarksDefinition,
-  bookmarksProvider,
-} from "@dashora/widget-sdk/widgets/bookmarks/server";
-import { clockDefinition, clockProvider } from "@dashora/widget-sdk/widgets/clock/server";
-import { searchDefinition, searchProvider } from "@dashora/widget-sdk/widgets/search/server";
+import { createWidgetDataResponse, widgetDataResponseSchema } from "@dashora/widget-sdk";
 import {
   todoItemResponseSchema,
   todoItemsResponseSchema,
 } from "@dashora/widget-sdk/widgets/todo/server";
-import { createTodoProvider, todoDefinition } from "@dashora/widget-sdk/widgets/todo/server";
+import { todoDefinition } from "@dashora/widget-sdk/widgets/todo/server";
+import { weatherLocationSearchResponseSchema } from "@dashora/widget-sdk/widgets/weather/server";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { isStateChangingMethod, sendCsrfError, validateCsrf } from "../auth/csrf.js";
 import type { SessionService } from "../auth/session-service.js";
 import { sendApiError } from "../http/errors.js";
+import type { ProviderPlatform } from "../providers/platform.js";
+import { createOpenMeteoWeatherAdapter } from "../providers/weather/open-meteo.js";
+import type { GithubIntegrationService } from "../services/github-integration-service.js";
+import type { IcsBasicAuthIntegrationService } from "../services/ics-basic-auth-service.js";
 import { type TodoService, TodoServiceError } from "../services/todo-service.js";
+import { createDashoraWidgetServerRegistry } from "../widgets/registry.js";
 
 export type WidgetRouteOptions = {
   sessions: SessionService;
   todos: TodoService;
+  providers: ProviderPlatform;
+  githubIntegrations?: GithubIntegrationService;
+  icsBasicAuthIntegrations?: IcsBasicAuthIntegrationService;
+  resolveGithubToken?: () => string | null;
+  resolveCryptoApiKey?: () => string | null;
+  resolveEquitiesApiKey?: () => string | null;
 };
 
 async function requireCsrf(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
@@ -65,20 +62,53 @@ export async function registerWidgetRoutes(
   app: FastifyInstance,
   options: WidgetRouteOptions,
 ): Promise<void> {
-  const { sessions, todos } = options;
+  const {
+    sessions,
+    todos,
+    providers,
+    githubIntegrations,
+    icsBasicAuthIntegrations,
+    resolveGithubToken,
+    resolveCryptoApiKey,
+    resolveEquitiesApiKey,
+  } = options;
+  const weatherAdapter = createOpenMeteoWeatherAdapter(providers);
 
-  const serverRegistry = createWidgetServerRegistry([
-    toServerRegistration(searchDefinition, searchProvider),
-    toServerRegistration(clockDefinition, clockProvider),
-    toServerRegistration(bookmarksDefinition, bookmarksProvider),
-    toServerRegistration(
-      todoDefinition,
-      createTodoProvider({
-        listByInstance: async () => [],
-      }),
-    ),
-    toServerRegistration(demoMetricsDefinition, demoMetricsProvider),
-  ]);
+  const serverRegistry = createDashoraWidgetServerRegistry({
+    todoService: todos,
+    providers,
+    weatherAdapter,
+    ...(resolveGithubToken ? { resolveGithubToken } : {}),
+    ...(resolveCryptoApiKey ? { resolveCryptoApiKey } : {}),
+    ...(resolveEquitiesApiKey ? { resolveEquitiesApiKey } : {}),
+  });
+
+  app.get("/api/v1/widgets/weather/locations", async (request, reply) => {
+    const auth = await sessions.resolveSession(request, reply);
+    if (!auth) {
+      return sendApiError(reply, 401, "unauthenticated", "Authentication required");
+    }
+
+    const query = request.query as { q?: string; limit?: string };
+    const q = typeof query.q === "string" ? query.q.trim() : "";
+    if (q.length < 2) {
+      return sendApiError(
+        reply,
+        400,
+        "validation_error",
+        "Query parameter q must be at least 2 characters",
+      );
+    }
+    const limitRaw = typeof query.limit === "string" ? Number.parseInt(query.limit, 10) : 8;
+    const limit = Number.isFinite(limitRaw) ? Math.min(20, Math.max(1, limitRaw)) : 8;
+
+    try {
+      const results = await weatherAdapter.searchLocations(q, { limit });
+      return weatherLocationSearchResponseSchema.parse({ results });
+    } catch {
+      return sendApiError(reply, 502, "upstream_error", "Location search failed");
+    }
+  });
 
   app.get("/api/v1/widgets/:widgetType/instances/:instanceId/data", async (request, reply) => {
     const auth = await sessions.resolveSession(request, reply);
@@ -104,7 +134,7 @@ export async function registerWidgetRoutes(
     const definition = serverRegistry.requireDefinition(widgetType);
     const provider = serverRegistry.requireProvider(widgetType);
 
-    const query = request.query as { config?: string };
+    const query = request.query as { config?: string; refresh?: string };
     let config: unknown = {};
     if (typeof query.config === "string" && query.config.length > 0) {
       try {
@@ -113,6 +143,7 @@ export async function registerWidgetRoutes(
         return sendApiError(reply, 400, "validation_error", "Invalid config query JSON");
       }
     }
+    const forceRefresh = query.refresh === "1" || query.refresh === "true";
 
     let parsedConfig: unknown;
     try {
@@ -171,6 +202,25 @@ export async function registerWidgetRoutes(
     const result = await provider.fetch({
       instanceId,
       config: parsedConfig,
+      forceRefresh,
+      ...(typeof parsedConfig === "object" &&
+      parsedConfig !== null &&
+      "credentialId" in parsedConfig &&
+      typeof (parsedConfig as { credentialId?: unknown }).credentialId === "string"
+        ? { credentialId: (parsedConfig as { credentialId: string }).credentialId }
+        : {}),
+      getSecret: async (credentialId) => {
+        if (githubIntegrations) {
+          const token = await githubIntegrations.getToken(auth.user.id, credentialId);
+          if (token) {
+            return token;
+          }
+        }
+        if (icsBasicAuthIntegrations) {
+          return icsBasicAuthIntegrations.getSecretPayload(auth.user.id, credentialId);
+        }
+        return null;
+      },
     });
 
     return widgetDataResponseSchema.parse(

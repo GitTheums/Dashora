@@ -1,6 +1,7 @@
 import type { AuthUser } from "@dashora/shared";
 import { Button, EmptyState, Skeleton, Stack } from "@dashora/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ProviderDiagnosticsPage } from "../admin/provider-diagnostics-page.js";
 import { App } from "../app.js";
 import { type DashboardApi, createDashboardApi } from "../dashboard/api.js";
 import { DesignSystemPage } from "../design-system-page.js";
@@ -141,6 +142,10 @@ export function AuthGate({
   // Authenticated
   if (path === "/design-system") {
     return <DesignSystemPage />;
+  }
+
+  if (path === "/admin/providers") {
+    return <ProviderDiagnosticsPage apiBaseUrl={apiBaseUrl} />;
   }
 
   return (

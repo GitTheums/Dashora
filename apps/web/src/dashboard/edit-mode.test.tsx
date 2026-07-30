@@ -55,11 +55,35 @@ describe("view vs edit mode widget controls", () => {
 
     expect(await screen.findByRole("button", { name: "Add widget" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Weather actions/i })).toBeTruthy();
-    expect(screen.getByLabelText(/Drag Weather/i)).toBeTruthy();
+    const dragHandle = screen.getByLabelText(/Drag Weather/i);
+    expect(dragHandle).toBeTruthy();
+    expect(dragHandle.classList.contains("dashora-widget-drag-handle")).toBe(true);
+    expect(document.querySelector(".dashora-widget-drag-handle")).toBeTruthy();
+    expect(document.querySelector("[data-grid-drag-cancel]")).toBeTruthy();
     const announcer = screen.getByTestId("edit-mode-announcer");
     expect(announcer.textContent).toMatch(/Dashboard edit mode enabled/i);
     expect(announcer.classList.contains("visually-hidden")).toBe(true);
     expect(document.querySelector('.dash-layout[data-edit="true"]')).toBeTruthy();
+  });
+
+  it("keeps nested SVG inside the drag handle eligible for drag start", async () => {
+    renderDashboard();
+    await screen.findByLabelText(/Weather widget/i);
+    fireEvent.click(screen.getByRole("button", { name: "Edit dashboard" }));
+
+    const dragHandle = await screen.findByLabelText(/Drag Weather/i);
+    const svg = dragHandle.querySelector("svg");
+    expect(svg).toBeTruthy();
+    if (!svg) {
+      return;
+    }
+
+    const { shouldStartWidgetDrag } = await import("./layout/drag-config.js");
+    expect(shouldStartWidgetDrag(svg)).toBe(true);
+    expect(shouldStartWidgetDrag(dragHandle)).toBe(true);
+
+    const refresh = screen.getByRole("button", { name: /Refresh Weather/i });
+    expect(shouldStartWidgetDrag(refresh)).toBe(false);
   });
 
   it("hides edit controls again after Done and closes the catalog", async () => {

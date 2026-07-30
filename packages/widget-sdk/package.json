@@ -32,6 +32,30 @@
       "types": "./dist/widgets/todo/index.d.ts",
       "import": "./dist/widgets/todo/index.js"
     },
+    "./widgets/weather": {
+      "types": "./dist/widgets/weather/index.d.ts",
+      "import": "./dist/widgets/weather/index.js"
+    },
+    "./widgets/rss": {
+      "types": "./dist/widgets/rss/index.d.ts",
+      "import": "./dist/widgets/rss/index.js"
+    },
+    "./widgets/calendar": {
+      "types": "./dist/widgets/calendar/index.d.ts",
+      "import": "./dist/widgets/calendar/index.js"
+    },
+    "./widgets/github-repository": {
+      "types": "./dist/widgets/github-repository/index.d.ts",
+      "import": "./dist/widgets/github-repository/index.js"
+    },
+    "./widgets/github-releases": {
+      "types": "./dist/widgets/github-releases/index.d.ts",
+      "import": "./dist/widgets/github-releases/index.js"
+    },
+    "./widgets/markets": {
+      "types": "./dist/widgets/markets/index.d.ts",
+      "import": "./dist/widgets/markets/index.js"
+    },
     "./widgets/search/server": {
       "types": "./dist/widgets/search/server.d.ts",
       "import": "./dist/widgets/search/server.js"
@@ -48,6 +72,30 @@
       "types": "./dist/widgets/todo/server.d.ts",
       "import": "./dist/widgets/todo/server.js"
     },
+    "./widgets/weather/server": {
+      "types": "./dist/widgets/weather/server.d.ts",
+      "import": "./dist/widgets/weather/server.js"
+    },
+    "./widgets/rss/server": {
+      "types": "./dist/widgets/rss/server.d.ts",
+      "import": "./dist/widgets/rss/server.js"
+    },
+    "./widgets/calendar/server": {
+      "types": "./dist/widgets/calendar/server.d.ts",
+      "import": "./dist/widgets/calendar/server.js"
+    },
+    "./widgets/github-repository/server": {
+      "types": "./dist/widgets/github-repository/server.d.ts",
+      "import": "./dist/widgets/github-repository/server.js"
+    },
+    "./widgets/github-releases/server": {
+      "types": "./dist/widgets/github-releases/server.d.ts",
+      "import": "./dist/widgets/github-releases/server.js"
+    },
+    "./widgets/markets/server": {
+      "types": "./dist/widgets/markets/server.d.ts",
+      "import": "./dist/widgets/markets/server.js"
+    },
     "./widgets": {
       "types": "./dist/widgets/index.d.ts",
       "import": "./dist/widgets/index.js"
@@ -63,6 +111,7 @@
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
+    "@dashora/shared": "workspace:*",
     "zod": "^3.24.2"
   },
   "peerDependencies": {

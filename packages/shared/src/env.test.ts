@@ -56,8 +56,28 @@ describe("parseServerEnv", () => {
     expect(env.LOGIN_RATE_LIMIT_MAX).toBe(5);
   });
 
-  it("defaults cookie secure to auto", () => {
+  it("parses provider HTTP defaults", () => {
     const env = parseServerEnv({}, { version: "0.1.0" });
-    expect(env.COOKIE_SECURE).toBe("auto");
+    expect(env.PROVIDER_USER_AGENT).toContain("Dashora/0.1.0");
+    expect(env.PROVIDER_CONNECT_TIMEOUT_MS).toBe(5_000);
+    expect(env.PROVIDER_REQUEST_TIMEOUT_MS).toBe(15_000);
+    expect(env.PROVIDER_MAX_RESPONSE_BYTES).toBe(2_000_000);
+    expect(env.PROVIDER_MAX_REDIRECTS).toBe(5);
+    expect(env.PROVIDER_RATE_LIMIT_MAX).toBe(60);
+    expect(env.PROVIDER_CIRCUIT_FAILURE_THRESHOLD).toBe(5);
+    expect(env.SECRETS_ENCRYPTION_KEY).toBeUndefined();
+    expect(env.GITHUB_TOKEN).toBeUndefined();
+  });
+
+  it("accepts GitHub secret env overrides", () => {
+    const env = parseServerEnv(
+      {
+        SECRETS_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        GITHUB_TOKEN: "ghp_test_token",
+      },
+      { version: "0.1.0" },
+    );
+    expect(env.SECRETS_ENCRYPTION_KEY).toHaveLength(64);
+    expect(env.GITHUB_TOKEN).toBe("ghp_test_token");
   });
 });

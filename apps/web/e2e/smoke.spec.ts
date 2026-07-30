@@ -415,7 +415,8 @@ test("first drag and resize persist without jumping back", async ({ page }) => {
     return;
   }
 
-  const handle = widget.locator(".layout-placeholder__drag-handle");
+  const handle = widget.locator(".dashora-widget-drag-handle");
+  await expect(handle).toHaveClass(/dashora-widget-drag-handle/);
   const handleBox = await handle.boundingBox();
   expect(handleBox).not.toBeNull();
   if (!handleBox) {

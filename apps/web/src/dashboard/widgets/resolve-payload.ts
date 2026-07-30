@@ -10,10 +10,33 @@ import {
   resolveBookmarksData,
 } from "@dashora/widget-sdk/widgets/bookmarks";
 import {
+  CALENDAR_WIDGET_ID,
+  calendarConfigSchema,
+  createCalendarClient,
+} from "@dashora/widget-sdk/widgets/calendar";
+import {
   CLOCK_WIDGET_ID,
   buildClockData,
   clockConfigSchema,
 } from "@dashora/widget-sdk/widgets/clock";
+import {
+  GITHUB_RELEASES_WIDGET_ID,
+  createGithubReleasesClient,
+  githubReleasesConfigSchema,
+} from "@dashora/widget-sdk/widgets/github-releases";
+import {
+  GITHUB_REPOSITORY_WIDGET_ID,
+  createGithubRepositoryClient,
+  githubRepositoryConfigSchema,
+  isGithubRepositoryConfigured,
+} from "@dashora/widget-sdk/widgets/github-repository";
+import {
+  MARKETS_WIDGET_ID,
+  createMarketsClient,
+  isMarketsConfigured,
+  marketsConfigSchema,
+} from "@dashora/widget-sdk/widgets/markets";
+import { RSS_WIDGET_ID, createRssClient, rssConfigSchema } from "@dashora/widget-sdk/widgets/rss";
 import {
   SEARCH_WIDGET_ID,
   resolveSearchData,
@@ -25,6 +48,11 @@ import {
   filterVisibleTodoItems,
   todoConfigSchema,
 } from "@dashora/widget-sdk/widgets/todo";
+import {
+  WEATHER_WIDGET_ID,
+  createWeatherClient,
+  weatherConfigSchema,
+} from "@dashora/widget-sdk/widgets/weather";
 
 export type ResolvedWidgetPayload = {
   state: WidgetState;
@@ -33,6 +61,12 @@ export type ResolvedWidgetPayload = {
 };
 
 const todoClient = createTodoClient();
+const weatherClient = createWeatherClient();
+const rssClient = createRssClient();
+const calendarClient = createCalendarClient();
+const githubRepositoryClient = createGithubRepositoryClient();
+const githubReleasesClient = createGithubReleasesClient();
+const marketsClient = createMarketsClient();
 
 function payload(
   state: WidgetState,
@@ -51,7 +85,7 @@ function disabledPayload(message: string): ResolvedWidgetPayload {
 
 /**
  * Resolves display data for registered widgets on the client.
- * Config-backed widgets derive payloads locally; Todo loads from the API.
+ * Config-backed widgets derive payloads locally; remote widgets load from the API.
  */
 export async function resolveTypedWidgetPayload(
   type: string,
@@ -123,6 +157,138 @@ export async function resolveTypedWidgetPayload(
       } catch (error) {
         return payload("error", {
           message: error instanceof Error ? error.message : "Could not load tasks.",
+        });
+      }
+    }
+    case WEATHER_WIDGET_ID: {
+      const config = weatherConfigSchema.parse(rawConfig);
+      if (!config.enabled) {
+        return disabledPayload("Weather is disabled in settings.");
+      }
+      if (!config.location) {
+        return payload("configuration-required", {
+          message: "Search for a location in settings to show the forecast.",
+        });
+      }
+      try {
+        const envelope = await weatherClient.fetchData(instanceId, config);
+        return payload(envelope.state, {
+          ...(envelope.data !== undefined ? { data: envelope.data } : {}),
+          ...(envelope.message !== undefined ? { message: envelope.message } : {}),
+        });
+      } catch (error) {
+        return payload("error", {
+          message: error instanceof Error ? error.message : "Could not load the weather forecast.",
+        });
+      }
+    }
+    case RSS_WIDGET_ID: {
+      const config = rssConfigSchema.parse(rawConfig);
+      if (!config.enabled) {
+        return disabledPayload("RSS is disabled in settings.");
+      }
+      if (config.feeds.length === 0) {
+        return payload("configuration-required", {
+          message: "Add at least one feed URL in settings.",
+        });
+      }
+      try {
+        const envelope = await rssClient.fetchData(instanceId, config);
+        return payload(envelope.state, {
+          ...(envelope.data !== undefined ? { data: envelope.data } : {}),
+          ...(envelope.message !== undefined ? { message: envelope.message } : {}),
+        });
+      } catch (error) {
+        return payload("error", {
+          message: error instanceof Error ? error.message : "Could not load feeds.",
+        });
+      }
+    }
+    case CALENDAR_WIDGET_ID: {
+      const config = calendarConfigSchema.parse(rawConfig);
+      if (!config.enabled) {
+        return disabledPayload("Calendar is disabled in settings.");
+      }
+      if (config.feeds.length === 0) {
+        return payload("configuration-required", {
+          message: "Add at least one ICS feed URL in settings.",
+        });
+      }
+      try {
+        const envelope = await calendarClient.fetchData(instanceId, config);
+        return payload(envelope.state, {
+          ...(envelope.data !== undefined ? { data: envelope.data } : {}),
+          ...(envelope.message !== undefined ? { message: envelope.message } : {}),
+        });
+      } catch (error) {
+        return payload("error", {
+          message: error instanceof Error ? error.message : "Could not load calendar feeds.",
+        });
+      }
+    }
+    case GITHUB_REPOSITORY_WIDGET_ID: {
+      const config = githubRepositoryConfigSchema.parse(rawConfig);
+      if (!config.enabled) {
+        return disabledPayload("GitHub Repository is disabled in settings.");
+      }
+      if (!isGithubRepositoryConfigured(config)) {
+        return payload("configuration-required", {
+          message: "Set the repository owner and name in settings.",
+        });
+      }
+      try {
+        const envelope = await githubRepositoryClient.fetchData(instanceId, config);
+        return payload(envelope.state, {
+          ...(envelope.data !== undefined ? { data: envelope.data } : {}),
+          ...(envelope.message !== undefined ? { message: envelope.message } : {}),
+        });
+      } catch (error) {
+        return payload("error", {
+          message: error instanceof Error ? error.message : "Could not load the GitHub repository.",
+        });
+      }
+    }
+    case GITHUB_RELEASES_WIDGET_ID: {
+      const config = githubReleasesConfigSchema.parse(rawConfig);
+      if (!config.enabled) {
+        return disabledPayload("GitHub Releases is disabled in settings.");
+      }
+      if (config.repositories.length === 0) {
+        return payload("configuration-required", {
+          message: "Add at least one repository in settings.",
+        });
+      }
+      try {
+        const envelope = await githubReleasesClient.fetchData(instanceId, config);
+        return payload(envelope.state, {
+          ...(envelope.data !== undefined ? { data: envelope.data } : {}),
+          ...(envelope.message !== undefined ? { message: envelope.message } : {}),
+        });
+      } catch (error) {
+        return payload("error", {
+          message: error instanceof Error ? error.message : "Could not load GitHub releases.",
+        });
+      }
+    }
+    case MARKETS_WIDGET_ID: {
+      const config = marketsConfigSchema.parse(rawConfig);
+      if (!config.enabled) {
+        return disabledPayload("Markets is disabled in settings.");
+      }
+      if (!isMarketsConfigured(config)) {
+        return payload("configuration-required", {
+          message: "Add at least one symbol in settings to build a watchlist.",
+        });
+      }
+      try {
+        const envelope = await marketsClient.fetchData(instanceId, config);
+        return payload(envelope.state, {
+          ...(envelope.data !== undefined ? { data: envelope.data } : {}),
+          ...(envelope.message !== undefined ? { message: envelope.message } : {}),
+        });
+      } catch (error) {
+        return payload("error", {
+          message: error instanceof Error ? error.message : "Could not load market quotes.",
         });
       }
     }

@@ -6,11 +6,16 @@ import { createSessionService } from "./auth/session-service.js";
 import { type SetupService, createSetupService } from "./auth/setup-service.js";
 import type { OpenedDatabase } from "./db/client.js";
 import { type Repositories, createRepositories } from "./db/repositories/index.js";
+import { type ProviderPlatform, createProviderPlatform } from "./providers/platform.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerIntegrationRoutes } from "./routes/integrations.js";
+import { registerProviderDiagnosticsRoutes } from "./routes/provider-diagnostics.js";
 import { registerWidgetRoutes } from "./routes/widgets.js";
 import { type DashboardService, createDashboardService } from "./services/dashboard-service.js";
+import { createGithubIntegrationService } from "./services/github-integration-service.js";
+import { createIcsBasicAuthIntegrationService } from "./services/ics-basic-auth-service.js";
 import { type TodoService, createTodoService } from "./services/todo-service.js";
 
 /** Paths scrubbed from structured logs — never emit secrets or session material. */
@@ -21,6 +26,7 @@ export const LOG_REDACT_PATHS = [
   'res.headers["set-cookie"]',
   "req.body.password",
   "req.body.token",
+  "req.body.username",
   "req.body.csrfToken",
 ];
 
@@ -39,11 +45,28 @@ export type BuildAppOptions = {
     | "LOGIN_RATE_LIMIT_WINDOW_MS"
     | "PUBLIC_BASE_URL"
     | "PORT"
+    | "PROVIDER_USER_AGENT"
+    | "PROVIDER_CONNECT_TIMEOUT_MS"
+    | "PROVIDER_REQUEST_TIMEOUT_MS"
+    | "PROVIDER_MAX_RESPONSE_BYTES"
+    | "PROVIDER_MAX_REDIRECTS"
+    | "PROVIDER_RATE_LIMIT_MAX"
+    | "PROVIDER_RATE_LIMIT_WINDOW_MS"
+    | "PROVIDER_CIRCUIT_FAILURE_THRESHOLD"
+    | "PROVIDER_CIRCUIT_OPEN_MS"
+    | "PROVIDER_CACHE_TTL_SECONDS"
+    | "PROVIDER_CACHE_SWR_SECONDS"
+    | "SECRETS_ENCRYPTION_KEY"
+    | "GITHUB_TOKEN"
+    | "COINGECKO_API_KEY"
+    | "FINNHUB_API_KEY"
   >;
   database?: OpenedDatabase;
   logger?: boolean | { level: string };
   /** Optional override for tests. */
   setup?: SetupService;
+  /** Optional override for tests. */
+  providers?: ProviderPlatform;
 };
 
 export type AppServices = {
@@ -51,6 +74,7 @@ export type AppServices = {
   setup: SetupService;
   dashboards: DashboardService;
   todos: TodoService;
+  providers: ProviderPlatform;
 };
 
 declare module "fastify" {
@@ -107,6 +131,27 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     });
   const dashboards = createDashboardService(repos);
   const todos = createTodoService(repos);
+  const providers =
+    options.providers ??
+    createProviderPlatform({
+      env: options.env,
+      cacheRepository: repos.cacheEntries,
+    });
+  const githubIntegrations = createGithubIntegrationService({
+    repos,
+    ...(options.env.SECRETS_ENCRYPTION_KEY
+      ? { secretsEncryptionKey: options.env.SECRETS_ENCRYPTION_KEY }
+      : {}),
+  });
+  const icsBasicAuthIntegrations = createIcsBasicAuthIntegrationService({
+    repos,
+    ...(options.env.SECRETS_ENCRYPTION_KEY
+      ? { secretsEncryptionKey: options.env.SECRETS_ENCRYPTION_KEY }
+      : {}),
+  });
+  const resolveGithubToken = () => options.env.GITHUB_TOKEN ?? null;
+  const resolveCryptoApiKey = () => options.env.COINGECKO_API_KEY ?? null;
+  const resolveEquitiesApiKey = () => options.env.FINNHUB_API_KEY ?? null;
   const sessions = createSessionService({
     repos,
     sessionTtlMs: options.env.SESSION_TTL_MS,
@@ -115,7 +160,11 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     nodeEnv: options.env.NODE_ENV,
   });
 
-  app.decorate("dashora", { repos, setup, dashboards, todos });
+  app.decorate("dashora", { repos, setup, dashboards, todos, providers });
+
+  app.addHook("onClose", async () => {
+    providers.cancel();
+  });
 
   // Issue or reuse a persisted setup token once at process start — never on status checks.
   await setup.ensureIssued(app.log, resolvePublicBaseUrl(options.env));
@@ -131,7 +180,22 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   });
 
   await registerDashboardRoutes(app, { sessions, dashboards });
-  await registerWidgetRoutes(app, { sessions, todos });
+  await registerWidgetRoutes(app, {
+    sessions,
+    todos,
+    providers,
+    githubIntegrations,
+    icsBasicAuthIntegrations,
+    resolveGithubToken,
+    resolveCryptoApiKey,
+    resolveEquitiesApiKey,
+  });
+  await registerIntegrationRoutes(app, {
+    sessions,
+    githubIntegrations,
+    icsBasicAuthIntegrations,
+  });
+  await registerProviderDiagnosticsRoutes(app, { sessions, providers });
 
   return app;
 }

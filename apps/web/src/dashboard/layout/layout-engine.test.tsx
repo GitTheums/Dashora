@@ -318,6 +318,36 @@ describe("layout engine toolbar", () => {
     expect(within(toolbar).getByRole("button", { name: "Undo" })).toBeTruthy();
     expect(within(toolbar).getByRole("button", { name: "Reset layout" })).toBeTruthy();
   });
+
+  it("renders the canonical drag handle class in edit mode", async () => {
+    const api = createMemoryDashboardApi();
+    const dashboard = await api.getDashboard();
+    const home = dashboard.pages[0];
+    expect(home).toBeDefined();
+    if (!home) {
+      return;
+    }
+
+    renderEngine(api, home.id);
+    const handle = await screen.findByLabelText(/Drag Weather/i);
+    expect(handle.classList.contains("dashora-widget-drag-handle")).toBe(true);
+    expect(handle.querySelector("svg")).toBeTruthy();
+  });
+
+  it("hides drag handles when edit mode is off", async () => {
+    const api = createMemoryDashboardApi();
+    const dashboard = await api.getDashboard();
+    const home = dashboard.pages[0];
+    expect(home).toBeDefined();
+    if (!home) {
+      return;
+    }
+
+    renderEngine(api, home.id, { editMode: false });
+    await screen.findByLabelText(/Weather widget/i);
+    expect(screen.queryByLabelText(/Drag Weather/i)).toBeNull();
+    expect(document.querySelector(".dashora-widget-drag-handle")).toBeNull();
+  });
 });
 
 // Keep debounce constant referenced so refactors that change timing stay intentional.
