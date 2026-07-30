@@ -1,15 +1,16 @@
 import type { HTMLAttributes, ReactNode } from "react";
+import { cx } from "./utils/cx.js";
+
+export type StackGap = "xs" | "sm" | "md" | "lg" | "xl";
 
 export type StackProps = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode;
-  gap?: "sm" | "md" | "lg";
+  gap?: StackGap;
 };
 
 export function Stack({ children, className, gap = "md", ...rest }: StackProps) {
-  const classes = `dashora-stack dashora-stack--gap-${gap}${className ? ` ${className}` : ""}`;
-
   return (
-    <div className={classes} {...rest}>
+    <div className={cx("ds-stack", `ds-stack--gap-${gap}`, className)} {...rest}>
       {children}
     </div>
   );

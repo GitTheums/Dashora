@@ -44,3 +44,10 @@ Desktop.ini
 .cache/
 tmp/
 temp/
+
+# Runtime data (SQLite and related files)
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm

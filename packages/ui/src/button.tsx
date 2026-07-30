@@ -1,22 +1,34 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { cx } from "./utils/cx.js";
+
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+export type ButtonSize = "sm" | "md" | "lg";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
-  variant?: "primary" | "secondary";
+  variant?: ButtonVariant;
+  size?: ButtonSize;
 };
 
 export function Button({
   children,
   className,
   variant = "primary",
+  size = "md",
   type = "button",
   ...rest
 }: ButtonProps) {
-  const variantClass = variant === "secondary" ? " dashora-button--secondary" : "";
-  const classes = `dashora-button${variantClass}${className ? ` ${className}` : ""}`;
-
   return (
-    <button type={type} className={classes} {...rest}>
+    <button
+      type={type}
+      className={cx(
+        "ds-button",
+        variant !== "primary" && `ds-button--${variant}`,
+        size !== "md" && `ds-button--${size}`,
+        className,
+      )}
+      {...rest}
+    >
       {children}
     </button>
   );

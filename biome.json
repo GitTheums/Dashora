@@ -12,7 +12,8 @@
       "**/node_modules/**",
       "**/.vite/**",
       "**/playwright-report/**",
-      "**/test-results/**"
+      "**/test-results/**",
+      "**/drizzle/meta/**"
     ]
   },
   "formatter": {

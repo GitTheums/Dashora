@@ -7,6 +7,50 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./examples/demo-metrics": {
+      "types": "./dist/examples/demo-metrics/index.d.ts",
+      "import": "./dist/examples/demo-metrics/index.js"
+    },
+    "./examples/demo-metrics/server": {
+      "types": "./dist/examples/demo-metrics/server.d.ts",
+      "import": "./dist/examples/demo-metrics/server.js"
+    },
+    "./widgets/search": {
+      "types": "./dist/widgets/search/index.d.ts",
+      "import": "./dist/widgets/search/index.js"
+    },
+    "./widgets/clock": {
+      "types": "./dist/widgets/clock/index.d.ts",
+      "import": "./dist/widgets/clock/index.js"
+    },
+    "./widgets/bookmarks": {
+      "types": "./dist/widgets/bookmarks/index.d.ts",
+      "import": "./dist/widgets/bookmarks/index.js"
+    },
+    "./widgets/todo": {
+      "types": "./dist/widgets/todo/index.d.ts",
+      "import": "./dist/widgets/todo/index.js"
+    },
+    "./widgets/search/server": {
+      "types": "./dist/widgets/search/server.d.ts",
+      "import": "./dist/widgets/search/server.js"
+    },
+    "./widgets/clock/server": {
+      "types": "./dist/widgets/clock/server.d.ts",
+      "import": "./dist/widgets/clock/server.js"
+    },
+    "./widgets/bookmarks/server": {
+      "types": "./dist/widgets/bookmarks/server.d.ts",
+      "import": "./dist/widgets/bookmarks/server.js"
+    },
+    "./widgets/todo/server": {
+      "types": "./dist/widgets/todo/server.d.ts",
+      "import": "./dist/widgets/todo/server.js"
+    },
+    "./widgets": {
+      "types": "./dist/widgets/index.d.ts",
+      "import": "./dist/widgets/index.js"
     }
   },
   "main": "./dist/index.js",
@@ -21,7 +65,25 @@
   "dependencies": {
     "zod": "^3.24.2"
   },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@testing-library/react": "^16.2.0",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "jsdom": "^26.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
   }

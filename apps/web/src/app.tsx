@@ -1,20 +1,23 @@
-import { Stack } from "@dashora/ui";
+import type { DashboardApi } from "./dashboard/api.js";
+import { DashboardPage } from "./dashboard/dashboard-page.js";
+
+export type AppSession = {
+  displayName: string;
+  onSignOut: () => void;
+};
 
 export type AppProps = {
   appName: string;
+  session?: AppSession;
+  dashboardApi?: DashboardApi;
 };
 
-export function App({ appName }: AppProps) {
+export function App({ appName, session, dashboardApi }: AppProps) {
   return (
-    <main className="page">
-      <Stack gap="md" className="panel">
-        <p className="eyebrow">{appName}</p>
-        <h1>Dashora development environment is running</h1>
-        <p className="lede">
-          Frontend and API scaffolding are ready. Add widgets and routes when you are prepared to
-          build features.
-        </p>
-      </Stack>
-    </main>
+    <DashboardPage
+      appName={appName}
+      {...(session ? { session } : {})}
+      {...(dashboardApi ? { api: dashboardApi } : {})}
+    />
   );
 }

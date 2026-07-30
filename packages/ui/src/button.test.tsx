@@ -7,4 +7,11 @@ describe("Button", () => {
     render(<Button>Continue</Button>);
     expect(screen.getByRole("button", { name: "Continue" })).toBeTruthy();
   });
+
+  it("supports secondary variant", () => {
+    render(<Button variant="secondary">Cancel</Button>);
+    expect(screen.getByRole("button", { name: "Cancel" }).className).toContain(
+      "ds-button--secondary",
+    );
+  });
 });

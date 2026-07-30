@@ -2,6 +2,7 @@ import { healthResponseSchema } from "@dashora/shared";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../app.js";
+import { createTestServerEnv } from "../test/env.js";
 
 describe("GET /api/v1/health", () => {
   let app: FastifyInstance;
@@ -10,7 +11,7 @@ describe("GET /api/v1/health", () => {
     app = await buildApp({
       version: "0.1.0-test",
       logger: false,
-      corsOrigin: "http://localhost:5173",
+      env: createTestServerEnv(),
     });
   });
 

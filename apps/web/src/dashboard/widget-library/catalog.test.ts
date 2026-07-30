@@ -1,0 +1,67 @@
+import { describe, expect, it } from "vitest";
+import {
+  WIDGET_CATALOG,
+  createInstanceFromCatalog,
+  filterCatalog,
+  formatDefaultSize,
+  getCatalogEntry,
+  shouldOpenSettingsAfterAdd,
+} from "./catalog.js";
+
+describe("widget catalog", () => {
+  it("includes production widgets, demo-metrics, and placeholders", () => {
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "search")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "clock")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "bookmarks")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "todo")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "demo-metrics")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.kind === "placeholder")).toBe(true);
+    expect(WIDGET_CATALOG.some((entry) => entry.id === "placeholder:bookmarks")).toBe(false);
+  });
+
+  it("filters by query and category", () => {
+    const demo = filterCatalog("demo", "all");
+    expect(demo.some((entry) => entry.id === "demo-metrics")).toBe(true);
+
+    const home = filterCatalog("", "home");
+    expect(home.every((entry) => entry.category === "home")).toBe(true);
+    expect(home.length).toBeGreaterThan(0);
+  });
+
+  it("creates typed and placeholder instances", () => {
+    const demo = getCatalogEntry("demo-metrics");
+    expect(demo).toBeTruthy();
+    if (!demo) {
+      return;
+    }
+    const typed = createInstanceFromCatalog(demo, "b1111111-1111-4111-8111-111111111201");
+    expect(typed.kind).toBe("widget");
+    if (typed.kind === "widget") {
+      expect(typed.type).toBe("demo-metrics");
+      expect(typed.config).toMatchObject({ metricLabel: "Active sessions" });
+    }
+
+    const weather = getCatalogEntry("placeholder:weather");
+    expect(weather).toBeTruthy();
+    if (!weather) {
+      return;
+    }
+    const placeholder = createInstanceFromCatalog(weather, "b1111111-1111-4111-8111-111111111202");
+    expect(placeholder.kind).toBe("placeholder");
+    expect(shouldOpenSettingsAfterAdd(weather)).toBe(false);
+  });
+
+  it("opens settings after add when integration is required", () => {
+    const services = getCatalogEntry("placeholder:services");
+    expect(services).toBeTruthy();
+    if (!services) {
+      return;
+    }
+    expect(services.capabilities.requiresIntegration).toBe(true);
+    expect(shouldOpenSettingsAfterAdd(services)).toBe(true);
+  });
+
+  it("formats default size previews", () => {
+    expect(formatDefaultSize({ colSpan: 4, rowSpan: 2 })).toBe("4×2");
+  });
+});

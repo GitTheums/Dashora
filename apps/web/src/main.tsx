@@ -1,7 +1,9 @@
+import { ThemeProvider } from "@dashora/ui";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App } from "./app.js";
+import { AuthGate } from "./auth/auth-gate.js";
 import { loadWebEnv } from "./env.js";
+import "@dashora/ui/fonts";
 import "@dashora/ui/styles.css";
 import "./styles.css";
 
@@ -14,6 +16,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App appName={env.VITE_APP_NAME} />
+    <ThemeProvider defaultMode="system">
+      <AuthGate appName={env.VITE_APP_NAME} apiBaseUrl={env.VITE_API_BASE_URL} />
+    </ThemeProvider>
   </StrictMode>,
 );

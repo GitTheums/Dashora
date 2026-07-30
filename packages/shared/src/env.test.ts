@@ -29,6 +29,7 @@ describe("parseServerEnv", () => {
     expect(env.PORT).toBe(3000);
     expect(env.APP_VERSION).toBe("0.1.0");
     expect(env.NODE_ENV).toBe("development");
+    expect(env.DASHORA_DATA_DIR).toBe("/data");
   });
 
   it("parses overrides", () => {
@@ -38,6 +39,10 @@ describe("parseServerEnv", () => {
         HOST: "127.0.0.1",
         LOG_LEVEL: "warn",
         TRUST_PROXY: "true",
+        DASHORA_DATA_DIR: "./data",
+        COOKIE_SECURE: "true",
+        SESSION_TTL_MS: "3600000",
+        LOGIN_RATE_LIMIT_MAX: "5",
       },
       { version: "0.1.0" },
     );
@@ -45,5 +50,14 @@ describe("parseServerEnv", () => {
     expect(env.HOST).toBe("127.0.0.1");
     expect(env.LOG_LEVEL).toBe("warn");
     expect(env.TRUST_PROXY).toBe(true);
+    expect(env.DASHORA_DATA_DIR).toBe("./data");
+    expect(env.COOKIE_SECURE).toBe(true);
+    expect(env.SESSION_TTL_MS).toBe(3_600_000);
+    expect(env.LOGIN_RATE_LIMIT_MAX).toBe(5);
+  });
+
+  it("defaults cookie secure to auto", () => {
+    const env = parseServerEnv({}, { version: "0.1.0" });
+    expect(env.COOKIE_SECURE).toBe("auto");
   });
 });

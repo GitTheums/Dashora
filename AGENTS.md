@@ -19,7 +19,7 @@ Dashora is an independent, self-hosted personal dashboard. Never copy source cod
 - Validate all external input with Zod.
 - Never expose provider tokens or secrets to the browser.
 - Never log passwords, cookies, tokens, secret values, or full authorization headers.
-- Every widget must support loading, empty, stale, error, disabled, and configuration-required states.
+- Every widget must support loading, refreshing, success, empty, stale, error, disabled, and configuration-required states.
 - Every new API route must include validation and tests.
 - Every visual component must support dark and light themes.
 - Meet WCAG AA contrast where practical.
