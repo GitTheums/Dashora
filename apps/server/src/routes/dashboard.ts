@@ -1,5 +1,7 @@
 import {
   createPageRequestSchema,
+  createPageWidgetRequestSchema,
+  createPageWidgetResponseSchema,
   dashboardResponseSchema,
   dashboardThemeResponseSchema,
   deletePageResponseSchema,
@@ -299,6 +301,36 @@ export async function registerDashboardRoutes(
     try {
       const layout = await dashboards.savePageLayout(auth.user.id, pageId, parsed.data.layout);
       return pageLayoutResponseSchema.parse(layout);
+    } catch (error) {
+      if (error instanceof DashboardServiceError) {
+        return sendApiError(reply, serviceErrorStatus(error.code), error.code, error.message);
+      }
+      throw error;
+    }
+  });
+
+  app.post("/api/v1/dashboard/pages/:pageId/widgets", async (request, reply) => {
+    if (!(await requireCsrf(request, reply))) {
+      return;
+    }
+    const auth = await sessions.resolveSession(request, reply);
+    if (!auth) {
+      return sendApiError(reply, 401, "unauthenticated", "Authentication required");
+    }
+
+    const pageId = readPageId(request);
+    if (!pageId) {
+      return sendApiError(reply, 400, "validation_error", "Page id is required");
+    }
+
+    const parsed = createPageWidgetRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return sendApiError(reply, 400, "validation_error", "Invalid widget creation payload");
+    }
+
+    try {
+      const created = await dashboards.createWidget(auth.user.id, pageId, parsed.data);
+      return reply.status(201).send(createPageWidgetResponseSchema.parse(created));
     } catch (error) {
       if (error instanceof DashboardServiceError) {
         return sendApiError(reply, serviceErrorStatus(error.code), error.code, error.message);

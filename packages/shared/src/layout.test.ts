@@ -7,6 +7,8 @@ import {
   convertLayoutBetweenBreakpoints,
   createDefaultPageLayout,
   createEmptyPageLayout,
+  createPageWidgetRequestSchema,
+  createPageWidgetResponseSchema,
   duplicateWidgetInLayout,
   findCollisions,
   findOpenSlot,
@@ -20,8 +22,10 @@ import {
   removeWidgetFromLayout,
   resolveBreakpoint,
   serializePageLayout,
+  typedWidgetInstanceSchema,
   updateWidgetInLayout,
 } from "./layout.js";
+import { createDashoraUuid } from "./uuid.js";
 
 function box(i: string, x: number, y: number, w: number, h: number): LayoutItem {
   return { i, x, y, w, h, minW: 1, minH: 1 };
@@ -174,5 +178,102 @@ describe("page widget union", () => {
     const slot = findOpenSlot(layout, 12, 4, 2);
     expect(slot.y).toBeGreaterThanOrEqual(2);
     expect(slot.x + 4).toBeLessThanOrEqual(12);
+  });
+
+  it("rejects typed widgets that use the type slug as the instance id", () => {
+    const result = typedWidgetInstanceSchema.safeParse({
+      kind: "widget",
+      id: "weather",
+      type: "weather",
+      title: "Weather",
+      enabled: true,
+      config: {},
+      schemaVersion: 1,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.path).toEqual(["id"]);
+    }
+  });
+});
+
+describe("create page widget schemas", () => {
+  it("accepts create requests without a persistent widget id", () => {
+    const weather = createPageWidgetRequestSchema.parse({
+      kind: "widget",
+      type: "weather",
+      title: "Weather",
+      config: {},
+      schemaVersion: 1,
+      defaultLayout: { colSpan: 4, rowSpan: 2 },
+    });
+    expect(weather).not.toHaveProperty("id");
+    expect(weather.kind).toBe("widget");
+    if (weather.kind === "widget") {
+      expect(weather.type).toBe("weather");
+    }
+
+    const rss = createPageWidgetRequestSchema.parse({
+      kind: "widget",
+      type: "rss",
+      defaultLayout: { colSpan: 4, rowSpan: 3 },
+    });
+    expect(rss).not.toHaveProperty("id");
+    expect(rss.kind).toBe("widget");
+    if (rss.kind === "widget") {
+      expect(rss.type).toBe("rss");
+    }
+  });
+
+  it("accepts a server response with distinct UUID instance ids", () => {
+    const weatherId = createDashoraUuid();
+    const rssId = createDashoraUuid();
+    expect(weatherId).not.toBe(rssId);
+
+    let document = createEmptyPageLayout();
+    document = addWidgetToLayout(
+      document,
+      {
+        kind: "widget",
+        id: weatherId,
+        type: "weather",
+        title: "Weather",
+        enabled: true,
+        config: {},
+        schemaVersion: 1,
+        lastUpdatedAt: null,
+      },
+      { colSpan: 4, rowSpan: 2 },
+    );
+    document = addWidgetToLayout(
+      document,
+      {
+        kind: "widget",
+        id: rssId,
+        type: "rss",
+        title: "RSS",
+        enabled: true,
+        config: { feeds: [] },
+        schemaVersion: 1,
+        lastUpdatedAt: null,
+      },
+      { colSpan: 4, rowSpan: 3 },
+    );
+
+    const weather = document.widgets.find((widget) => widget.id === weatherId);
+    const rss = document.widgets.find((widget) => widget.id === rssId);
+    expect(weather?.kind === "widget" && weather.type).toBe("weather");
+    expect(rss?.kind === "widget" && rss.type).toBe("rss");
+    expect(weatherId).not.toBe("weather");
+    expect(rssId).not.toBe("rss");
+
+    const pageId = createDashoraUuid();
+    const response = createPageWidgetResponseSchema.parse({
+      pageId,
+      widget: weather,
+      layout: document,
+      updatedAt: Date.now(),
+    });
+    expect(response.widget.id).toBe(weatherId);
   });
 });

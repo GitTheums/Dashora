@@ -7,9 +7,13 @@ import {
   type Page,
   type PageLayoutDocument,
   type PageLayoutResponse,
+  type PageWidget,
   type UpdatePageRequest,
+  addWidgetToLayout,
   clonePageLayout,
+  createDashoraUuid,
   createDefaultPageLayout,
+  createPageWidgetResponseSchema,
   pageLayoutDocumentSchema,
 } from "@dashora/shared";
 import type { DashboardApi } from "./api.js";
@@ -220,6 +224,50 @@ export function createMemoryDashboardApi(
       const updatedAt = now();
       layouts.set(pageId, { layout: createDefaultPageLayout(), updatedAt });
       return layoutResponse(pageId);
+    },
+
+    async createPageWidget(pageId, input) {
+      requirePage(pageId);
+      const current = layouts.get(pageId)?.layout ?? createDefaultPageLayout();
+      const instanceId = createDashoraUuid();
+      let widget: PageWidget;
+      if (input.kind === "widget") {
+        widget = {
+          kind: "widget",
+          id: instanceId,
+          type: input.type,
+          title: input.title ?? input.type,
+          enabled: input.enabled ?? true,
+          refreshIntervalSeconds: input.refreshIntervalSeconds ?? null,
+          config: structuredClone(input.config ?? {}),
+          schemaVersion: input.schemaVersion ?? 1,
+          lastUpdatedAt: null,
+        };
+      } else {
+        widget = {
+          kind: "placeholder",
+          id: instanceId,
+          title: input.title,
+          description: input.description ?? "",
+          tone: input.tone ?? "default",
+          enabled: input.enabled ?? true,
+          refreshIntervalSeconds: input.refreshIntervalSeconds ?? null,
+          lastUpdatedAt: null,
+        };
+      }
+      const next = addWidgetToLayout(current, widget, input.defaultLayout);
+      const updatedAt = now();
+      layouts.set(pageId, { layout: clonePageLayout(next), updatedAt });
+      const created = next.widgets.find((entry) => entry.id === instanceId);
+      if (!created) {
+        throw new DashboardApiError(500, "create_failed", "Failed to create widget");
+      }
+      return createPageWidgetResponseSchema.parse({
+        pageId,
+        widget: created,
+        layout: next,
+        updatedAt,
+      });
     },
   };
 }

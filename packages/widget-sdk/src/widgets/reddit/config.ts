@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { newConfigEntryId } from "../_shared/ids.js";
 
 export const redditSortSchema = z.enum(["hot", "new", "top", "rising"]);
 export type RedditSort = z.infer<typeof redditSortSchema>;
@@ -112,12 +113,5 @@ export function isRedditConfigured(config: RedditConfig): boolean {
 }
 
 export function newRedditSubredditId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `a${Date.now().toString(16).padStart(11, "0")}-1111-4111-8111-${Math.floor(
-    Math.random() * 1e12,
-  )
-    .toString(16)
-    .padStart(12, "0")}`;
+  return newConfigEntryId();
 }

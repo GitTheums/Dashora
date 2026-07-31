@@ -212,6 +212,8 @@ export {
   pageLayoutResponseSchema,
   savePageLayoutRequestSchema,
   resetPageLayoutResponseSchema,
+  createPageWidgetRequestSchema,
+  createPageWidgetResponseSchema,
   createDefaultPageLayout,
   createEmptyPageLayout,
   serializePageLayout,
@@ -245,4 +247,7 @@ export {
   type PageLayoutResponse,
   type SavePageLayoutRequest,
   type ResetPageLayoutResponse,
+  type CreatePageWidgetRequest,
+  type CreatePageWidgetResponse,
 } from "./layout.js";
+export { createDashoraUuid, isDashoraUuid } from "./uuid.js";

@@ -14,7 +14,7 @@ export {
   type SsrfGuardOptions,
   type SsrfValidationResult,
 } from "./ssrf.js";
-export { createPinnedDispatcher } from "./pinned-dispatcher.js";
+export { createPinnedDispatcher, pinnedFetch } from "./pinned-dispatcher.js";
 export { computeBackoffMs, sleep } from "./backoff.js";
 export { createProviderRateLimiter, type ProviderRateLimiter } from "./rate-limiter.js";
 export { createCircuitBreaker, type CircuitBreaker } from "./circuit-breaker.js";

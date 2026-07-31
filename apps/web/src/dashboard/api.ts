@@ -1,16 +1,20 @@
 import {
   type CreatePageRequest,
+  type CreatePageWidgetRequest,
+  type CreatePageWidgetResponse,
   type Dashboard,
   type Page,
   type PageLayoutDocument,
   type PageLayoutResponse,
   type UpdatePageRequest,
   apiErrorSchema,
+  createPageWidgetResponseSchema,
   dashboardResponseSchema,
   deletePageResponseSchema,
   pageLayoutResponseSchema,
   pageResponseSchema,
 } from "@dashora/shared";
+import type { ZodError } from "zod";
 
 export class DashboardApiError extends Error {
   readonly status: number;
@@ -60,6 +64,29 @@ async function parseError(response: Response): Promise<DashboardApiError> {
   return new DashboardApiError(response.status, "request_failed", "Request failed");
 }
 
+function parseResponse<T>(
+  schema: {
+    safeParse: (data: unknown) => { success: true; data: T } | { success: false; error: ZodError };
+  },
+  data: unknown,
+  schemaName: string,
+  invalidMessage: string,
+): T {
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path.join(".") || "(root)";
+    if (import.meta.env?.DEV) {
+      console.error(`[dashora:api] ${schemaName} validation failed`, {
+        schema: schemaName,
+        field,
+        issueCount: parsed.error.issues.length,
+      });
+    }
+    throw new DashboardApiError(502, "invalid_response", invalidMessage);
+  }
+  return parsed.data;
+}
+
 export type DashboardApi = {
   getDashboard: () => Promise<Dashboard>;
   createPage: (input: CreatePageRequest) => Promise<Page>;
@@ -70,6 +97,10 @@ export type DashboardApi = {
   getPageLayout: (pageId: string) => Promise<PageLayoutResponse>;
   savePageLayout: (pageId: string, layout: PageLayoutDocument) => Promise<PageLayoutResponse>;
   resetPageLayout: (pageId: string) => Promise<PageLayoutResponse>;
+  createPageWidget: (
+    pageId: string,
+    input: CreatePageWidgetRequest,
+  ) => Promise<CreatePageWidgetResponse>;
 };
 
 export function createDashboardApi(baseUrl: string): DashboardApi {
@@ -181,6 +212,19 @@ export function createDashboardApi(baseUrl: string): DashboardApi {
         throw await parseError(response);
       }
       return pageLayoutResponseSchema.parse(await response.json());
+    },
+
+    async createPageWidget(pageId, input) {
+      const response = await mutating(`/api/v1/dashboard/pages/${pageId}/widgets`, "POST", input);
+      if (!response.ok) {
+        throw await parseError(response);
+      }
+      return parseResponse(
+        createPageWidgetResponseSchema,
+        await response.json(),
+        "createPageWidgetResponseSchema",
+        "Dashora could not create this widget because the server returned an invalid response.",
+      );
     },
   };
 }

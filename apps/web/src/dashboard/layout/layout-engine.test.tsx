@@ -152,6 +152,7 @@ describe("layout engine persistence semantics", () => {
     const api: LayoutApi = {
       getPageLayout: base.getPageLayout,
       resetPageLayout: base.resetPageLayout,
+      createPageWidget: base.createPageWidget,
       savePageLayout: async (pageId, layout) => {
         if (pending.length === 0) {
           return await new Promise<PageLayoutResponse>((resolve) => {
@@ -236,6 +237,7 @@ describe("layout engine persistence semantics", () => {
     const api: LayoutApi = {
       getPageLayout: base.getPageLayout,
       resetPageLayout: base.resetPageLayout,
+      createPageWidget: base.createPageWidget,
       savePageLayout,
     };
 
@@ -274,6 +276,7 @@ describe("layout engine persistence semantics", () => {
     const api: LayoutApi = {
       getPageLayout: base.getPageLayout,
       resetPageLayout: base.resetPageLayout,
+      createPageWidget: base.createPageWidget,
       savePageLayout,
     };
 

@@ -248,6 +248,53 @@ export const resetPageLayoutResponseSchema = pageLayoutResponseSchema;
 
 export type ResetPageLayoutResponse = z.infer<typeof resetPageLayoutResponseSchema>;
 
+const widgetTypeSlugSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z][a-z0-9-]*$/);
+
+/**
+ * Create-widget request: no persistent instance id — the server mints the UUID.
+ * `type` is the catalog/definition slug (weather, rss, …), never the instance id.
+ */
+export const createPageWidgetRequestSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("widget"),
+      type: widgetTypeSlugSchema,
+      title: z.string().trim().min(1).max(80).optional(),
+      enabled: z.boolean().optional(),
+      refreshIntervalSeconds: z.number().int().positive().nullable().optional(),
+      config: z.record(z.unknown()).optional(),
+      schemaVersion: z.number().int().min(1).optional(),
+      defaultLayout: widgetPlacementSizeSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("placeholder"),
+      title: z.string().trim().min(1).max(80),
+      description: z.string().trim().max(240).optional(),
+      tone: placeholderToneSchema.optional(),
+      enabled: z.boolean().optional(),
+      refreshIntervalSeconds: z.number().int().positive().nullable().optional(),
+      defaultLayout: widgetPlacementSizeSchema,
+    })
+    .strict(),
+]);
+
+export type CreatePageWidgetRequest = z.infer<typeof createPageWidgetRequestSchema>;
+
+export const createPageWidgetResponseSchema = z.object({
+  pageId: z.string().uuid(),
+  widget: pageWidgetSchema,
+  layout: pageLayoutDocumentSchema,
+  updatedAt: z.number().int().nonnegative(),
+});
+
+export type CreatePageWidgetResponse = z.infer<typeof createPageWidgetResponseSchema>;
+
 /** Stable placeholder ids so default layouts remain comparable across boots. */
 const PLACEHOLDER_IDS = {
   weather: "a1111111-1111-4111-8111-111111111101",

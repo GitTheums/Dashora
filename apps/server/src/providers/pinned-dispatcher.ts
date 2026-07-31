@@ -1,14 +1,18 @@
 import type { LookupFunction } from "node:net";
 import { isIP } from "node:net";
-import { Agent } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
 
-// IMPORTANT: Node's global `fetch` is implemented with an internally vendored copy of undici
-// and only accepts a custom `dispatcher` whose Dispatcher/Handler interface generation matches
-// that internal version (`process.versions.undici`). The `undici` dependency in package.json is
-// deliberately pinned to the same major version Node bundles — bumping it to a newer major
-// without also confirming Node's bundled version breaks pinning silently (requests would throw
-// "invalid onRequestStart method" or similar at connect time). Covered by
-// http-client.test.ts's "pins the connection..." tests.
+/**
+ * IMPORTANT: Node's global `fetch` is backed by a vendored Undici whose Dispatcher/Handler
+ * contract must match the Agent you pass as `dispatcher`. On Node 26+, global fetch uses
+ * Undici 8.x while this package depends on Undici 6.x — mixing them throws
+ * `InvalidArgumentError: invalid onError method` (UND_ERR_INVALID_ARG) before any socket opens.
+ *
+ * Always pair Agents from this module with {@link pinnedFetch} (the same Undici package's
+ * `fetch`). Never pass a pinned Agent into `globalThis.fetch`. Covered by
+ * http-client.test.ts's "pins the connection..." tests.
+ */
+export const pinnedFetch = undiciFetch;
 
 type PinnedLookupResult = { address: string; family: number };
 
@@ -96,6 +100,8 @@ export function buildPinnedLookup(hostname: string, addresses: string[]): Lookup
  * could resolve to a different (private/internal) address than the one that was validated
  * ("DNS rebinding"). Scoped to a single outbound request attempt: create and close a fresh
  * instance per call, never share across hostnames or requests.
+ *
+ * Must be used with {@link pinnedFetch} (same Undici package), not Node's global `fetch`.
  */
 export function createPinnedDispatcher(hostname: string, addresses: string[]): Agent {
   return new Agent({

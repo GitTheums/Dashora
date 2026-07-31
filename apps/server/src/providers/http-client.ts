@@ -1,5 +1,5 @@
 import { ProviderError, toProviderError } from "./errors.js";
-import { createPinnedDispatcher } from "./pinned-dispatcher.js";
+import { createPinnedDispatcher, pinnedFetch } from "./pinned-dispatcher.js";
 import { redactHeaders } from "./redact.js";
 
 /**
@@ -170,11 +170,17 @@ function mapAbortToProviderError(error: unknown, phase: "connect" | "request"): 
   return toProviderError(error);
 }
 
-/** Fastify/Node's global `fetch` accepts a non-standard `dispatcher` option (undici). */
+/**
+ * Undici's `fetch` accepts a non-standard `dispatcher` option. When DNS pinning is active we
+ * MUST use {@link pinnedFetch} from the same undici package as the Agent — Node's global
+ * `fetch` uses a different vendored Undici and rejects mismatched dispatchers.
+ */
 type FetchInitWithDispatcher = RequestInit & { dispatcher?: import("undici").Agent };
 
 export function createProviderHttpClient(options: ProviderHttpClientOptions) {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  // Prefer undici's own fetch so unpinned and pinned paths share one stack. Callers may still
+  // inject a mock via `fetchImpl` for unit tests that never attach a dispatcher.
+  const fetchImpl = options.fetchImpl ?? (pinnedFetch as typeof fetch);
 
   async function request(input: ProviderHttpRequest): Promise<ProviderHttpResponse> {
     let currentUrl: string;
@@ -199,6 +205,8 @@ export function createProviderHttpClient(options: ProviderHttpClientOptions) {
         pinnedAddresses && pinnedAddresses.length > 0
           ? createPinnedDispatcher(new URL(currentUrl).hostname, pinnedAddresses)
           : undefined;
+      // Pinned Agents are from npm undici — always dispatch through that package's fetch.
+      const transport: typeof fetch = dispatcher ? (pinnedFetch as typeof fetch) : fetchImpl;
       const mutable: MutableAbort = {
         controller: new AbortController(),
         timers: [],
@@ -246,7 +254,7 @@ export function createProviderHttpClient(options: ProviderHttpClientOptions) {
       try {
         let response: Response;
         try {
-          response = await fetchImpl(currentUrl, {
+          response = await transport(currentUrl, {
             method,
             headers,
             ...(method === "GET" || method === "HEAD" || input.body === undefined

@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { createPageWidgetRequestSchema, isDashoraUuid } from "@dashora/shared";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import {
   WIDGET_CATALOG,
   createInstanceFromCatalog,
+  createRequestFromCatalog,
   filterCatalog,
   formatDefaultSize,
   getCatalogEntry,
+  newWidgetInstanceId,
   shouldOpenSettingsAfterAdd,
 } from "./catalog.js";
 
@@ -76,5 +80,60 @@ describe("widget catalog", () => {
 
   it("formats default size previews", () => {
     expect(formatDefaultSize({ colSpan: 4, rowSpan: 2 })).toBe("4×2");
+  });
+
+  it("builds create requests without a persistent id and keeps type as the slug", () => {
+    const weather = getCatalogEntry("weather");
+    expect(weather).toBeTruthy();
+    if (!weather) {
+      return;
+    }
+    const request = createRequestFromCatalog(weather);
+    expect(request).not.toHaveProperty("id");
+    expect(createPageWidgetRequestSchema.parse(request)).toMatchObject({
+      kind: "widget",
+      type: "weather",
+    });
+  });
+
+  it("never uses the catalog slug as the typed instance id", () => {
+    const weather = getCatalogEntry("weather");
+    expect(weather).toBeTruthy();
+    if (!weather) {
+      return;
+    }
+    const instanceId = newWidgetInstanceId();
+    const instance = createInstanceFromCatalog(weather, instanceId);
+    expect(instance.id).toBe(instanceId);
+    expect(instance.id).not.toBe("weather");
+    expect(isDashoraUuid(instance.id)).toBe(true);
+    if (instance.kind === "widget") {
+      expect(instance.type).toBe("weather");
+    }
+  });
+
+  it("generates valid UUIDs even when crypto.randomUUID is unavailable", () => {
+    const original = globalThis.crypto;
+    const getRandomValues = vi.fn((bytes: Uint8Array) => {
+      for (let i = 0; i < bytes.length; i += 1) {
+        bytes[i] = (i * 31 + 7) % 256;
+      }
+      return bytes;
+    });
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: { getRandomValues },
+    });
+    try {
+      const id = newWidgetInstanceId();
+      expect(z.string().uuid().safeParse(id).success).toBe(true);
+      expect(id).not.toMatch(/^a[0-9a-f]{11}-/);
+      expect(id).not.toBe("weather");
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: original,
+      });
+    }
   });
 });

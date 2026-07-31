@@ -335,6 +335,97 @@ export async function mockSession(page: Page, options: MockSessionOptions = {}) 
   });
 
   if (options.withLayout !== false) {
+    await page.route("**/api/v1/dashboard/pages/*/widgets", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      const url = new URL(route.request().url());
+      const parts = url.pathname.split("/");
+      const pageId = parts[parts.indexOf("pages") + 1] ?? HOME_PAGE_ID;
+      const body = route.request().postDataJSON() as {
+        kind: "widget" | "placeholder";
+        type?: string;
+        title?: string;
+        description?: string;
+        tone?: string;
+        config?: Record<string, unknown>;
+        schemaVersion?: number;
+        defaultLayout: {
+          colSpan: number;
+          rowSpan: number;
+          tabletColSpan?: number;
+          mobileColSpan?: number;
+        };
+      };
+      if ("id" in body) {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: { code: "validation_error", message: "Client must not supply widget id" },
+          }),
+        });
+        return;
+      }
+      const current = structuredClone(layouts.get(pageId) ?? defaultLayout());
+      const instanceId = crypto.randomUUID();
+      const widget =
+        body.kind === "widget"
+          ? {
+              kind: "widget" as const,
+              id: instanceId,
+              type: body.type ?? "clock",
+              title: body.title ?? body.type ?? "Widget",
+              enabled: true,
+              config: body.config ?? {},
+              schemaVersion: body.schemaVersion ?? 1,
+              lastUpdatedAt: null,
+            }
+          : {
+              kind: "placeholder" as const,
+              id: instanceId,
+              title: body.title ?? "Placeholder",
+              description: body.description ?? "",
+              tone: body.tone ?? "default",
+              enabled: true,
+              lastUpdatedAt: null,
+            };
+      current.widgets.push(widget);
+      const size = body.defaultLayout;
+      for (const breakpoint of ["lg", "md", "sm"] as const) {
+        const cols = breakpoint === "lg" ? 12 : breakpoint === "md" ? 8 : 4;
+        const w =
+          breakpoint === "lg"
+            ? size.colSpan
+            : breakpoint === "md"
+              ? (size.tabletColSpan ?? Math.min(size.colSpan, cols))
+              : (size.mobileColSpan ?? Math.min(size.colSpan, cols));
+        const maxY = current.layouts[breakpoint].reduce(
+          (acc, item) => Math.max(acc, item.y + item.h),
+          0,
+        );
+        current.layouts[breakpoint].push({
+          i: instanceId,
+          x: 0,
+          y: maxY,
+          w: Math.min(w, cols),
+          h: size.rowSpan,
+        });
+      }
+      layouts.set(pageId, current);
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          pageId,
+          widget,
+          layout: current,
+          updatedAt: Date.now(),
+        }),
+      });
+    });
+
     await page.route("**/api/v1/dashboard/pages/*/layout", async (route) => {
       const url = new URL(route.request().url());
       const parts = url.pathname.split("/");

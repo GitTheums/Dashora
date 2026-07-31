@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { newConfigEntryId } from "../_shared/ids.js";
 
 export const rssLayoutSchema = z.enum(["compact", "detailed", "cards"]);
 export type RssLayout = z.infer<typeof rssLayoutSchema>;
@@ -84,12 +85,5 @@ export const rssDataSchema = z.object({
 export type RssData = z.infer<typeof rssDataSchema>;
 
 export function newRssFeedId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `a${Date.now().toString(16).padStart(11, "0")}-1111-4111-8111-${Math.floor(
-    Math.random() * 1e12,
-  )
-    .toString(16)
-    .padStart(12, "0")}`;
+  return newConfigEntryId();
 }

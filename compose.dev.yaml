@@ -68,5 +68,6 @@ volumes:
   dashora-dev-server-modules:
   dashora-dev-web-modules:
   dashora-dev-shared-modules:
+  dashora-dev-ui-modules:
   dashora-dev-sdk-modules:
   dashora-pnpm-store:

@@ -1,4 +1,6 @@
 import {
+  type CreatePageWidgetRequest,
+  type CreatePageWidgetResponse,
   DEFAULT_DASHBOARD_NAME,
   DEFAULT_DASHBOARD_PAGES,
   DEFAULT_DASHBOARD_SLUG,
@@ -8,6 +10,9 @@ import {
   type PageIcon,
   type PageLayoutDocument,
   type PageLayoutResponse,
+  type PageWidget,
+  addWidgetToLayout,
+  createDashoraUuid,
   createDefaultPageLayout,
   pageIconSchema,
   pageLayoutDocumentSchema,
@@ -86,6 +91,11 @@ export type DashboardService = {
     layout: PageLayoutDocument,
   ) => Promise<PageLayoutResponse>;
   resetPageLayout: (ownerUserId: string, pageId: string) => Promise<PageLayoutResponse>;
+  createWidget: (
+    ownerUserId: string,
+    pageId: string,
+    input: CreatePageWidgetRequest,
+  ) => Promise<CreatePageWidgetResponse>;
 };
 
 export type DashboardServiceErrorCode =
@@ -350,6 +360,53 @@ export function createDashboardService(repos: Repositories): DashboardService {
         layout: stored.layout,
         updatedAt: stored.updatedAt,
         isDefault: false,
+      };
+    },
+
+    async createWidget(ownerUserId, pageId, input) {
+      await requireOwnedPage(ownerUserId, pageId);
+      const storedLayout = await repos.pageLayouts.findByPageId(pageId);
+      const currentLayout = storedLayout?.layout ?? createDefaultPageLayout();
+      const instanceId = createDashoraUuid();
+
+      let widget: PageWidget;
+      if (input.kind === "widget") {
+        widget = {
+          kind: "widget",
+          id: instanceId,
+          type: input.type,
+          title: input.title ?? input.type,
+          enabled: input.enabled ?? true,
+          refreshIntervalSeconds: input.refreshIntervalSeconds ?? null,
+          config: structuredClone(input.config ?? {}),
+          schemaVersion: input.schemaVersion ?? 1,
+          lastUpdatedAt: null,
+        };
+      } else {
+        widget = {
+          kind: "placeholder",
+          id: instanceId,
+          title: input.title,
+          description: input.description ?? "",
+          tone: input.tone ?? "default",
+          enabled: input.enabled ?? true,
+          refreshIntervalSeconds: input.refreshIntervalSeconds ?? null,
+          lastUpdatedAt: null,
+        };
+      }
+
+      const next = addWidgetToLayout(currentLayout, widget, input.defaultLayout);
+      const stored = await repos.pageLayouts.upsertForPage(pageId, next);
+      const created = stored.layout.widgets.find((entry) => entry.id === instanceId);
+      if (!created) {
+        throw new Error("Failed to persist created widget");
+      }
+
+      return {
+        pageId,
+        widget: created,
+        layout: stored.layout,
+        updatedAt: stored.updatedAt,
       };
     },
   };

@@ -1,5 +1,7 @@
 import type {
   BreakpointLayouts,
+  CreatePageWidgetRequest,
+  CreatePageWidgetResponse,
   LayoutBreakpoint,
   LayoutItem,
   PageLayoutDocument,
@@ -12,7 +14,6 @@ import {
   LAYOUT_MARGIN,
   LAYOUT_ROW_HEIGHT,
   LAYOUT_SAVE_DEBOUNCE_MS,
-  addWidgetToLayout,
   clonePageLayout,
   createDefaultPageLayout,
   duplicateWidgetInLayout,
@@ -32,12 +33,13 @@ import {
   useContainerWidth,
   verticalCompactor,
 } from "react-grid-layout";
+import { ZodError } from "zod";
 import "react-grid-layout/css/styles.css";
 import { useDashboardEditMode } from "../edit-mode-context.js";
 import {
   type WidgetCatalogEntry,
   catalogEntryForInstance,
-  createInstanceFromCatalog,
+  createRequestFromCatalog,
   newWidgetInstanceId,
   shouldOpenSettingsAfterAdd,
 } from "../widget-library/catalog.js";
@@ -56,6 +58,10 @@ export type LayoutApi = {
   getPageLayout: (pageId: string) => Promise<PageLayoutResponse>;
   savePageLayout: (pageId: string, layout: PageLayoutDocument) => Promise<PageLayoutResponse>;
   resetPageLayout: (pageId: string) => Promise<PageLayoutResponse>;
+  createPageWidget: (
+    pageId: string,
+    input: CreatePageWidgetRequest,
+  ) => Promise<CreatePageWidgetResponse>;
 };
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
@@ -348,7 +354,23 @@ export function DashboardLayoutEngine({ pageId, api }: DashboardLayoutEngineProp
 
   const commitDocument = useCallback(
     (next: PageLayoutDocument, options?: { recordUndoFrom?: PageLayoutDocument | null }) => {
-      const parsed = pageLayoutDocumentSchema.parse(next);
+      const parsedResult = pageLayoutDocumentSchema.safeParse(next);
+      if (!parsedResult.success) {
+        const field = parsedResult.error.issues[0]?.path.join(".") || "(root)";
+        if (import.meta.env?.DEV) {
+          console.error("[dashora:layout] pageLayoutDocumentSchema validation failed", {
+            schema: "pageLayoutDocumentSchema",
+            field,
+            issueCount: parsedResult.error.issues.length,
+          });
+        }
+        setSaveStatus("error");
+        setSaveError(
+          "Dashora could not update this layout because the document failed validation.",
+        );
+        return;
+      }
+      const parsed = parsedResult.data;
       const revision = ++layoutRevisionRef.current;
       if (options?.recordUndoFrom && !layoutsEqual(parsed, options.recordUndoFrom)) {
         setUndoDocument(clonePageLayout(options.recordUndoFrom));
@@ -369,6 +391,44 @@ export function DashboardLayoutEngine({ pageId, api }: DashboardLayoutEngineProp
       scheduleSave(parsed, revision);
     },
     [clearSaveTimer, scheduleSave],
+  );
+
+  const applyServerLayout = useCallback(
+    (
+      response: CreatePageWidgetResponse,
+      options?: { recordUndoFrom?: PageLayoutDocument | null },
+    ) => {
+      const parsedResult = pageLayoutDocumentSchema.safeParse(response.layout);
+      if (!parsedResult.success) {
+        const field = parsedResult.error.issues[0]?.path.join(".") || "(root)";
+        if (import.meta.env?.DEV) {
+          console.error("[dashora:layout] createPageWidget layout validation failed", {
+            schema: "pageLayoutDocumentSchema",
+            field,
+            issueCount: parsedResult.error.issues.length,
+          });
+        }
+        setSaveStatus("error");
+        setSaveError(
+          "Dashora could not create this widget because the server returned an invalid response.",
+        );
+        return null;
+      }
+      const parsed = parsedResult.data;
+      const revision = ++layoutRevisionRef.current;
+      if (options?.recordUndoFrom && !layoutsEqual(parsed, options.recordUndoFrom)) {
+        setUndoDocument(clonePageLayout(options.recordUndoFrom));
+      }
+      setDocument(parsed);
+      documentRef.current = parsed;
+      savedDocumentRef.current = clonePageLayout(parsed);
+      persistedRevisionRef.current = revision;
+      setSaveStatus("saved");
+      setSaveError(null);
+      clearSaveTimer();
+      return parsed;
+    },
+    [clearSaveTimer],
   );
 
   useEffect(() => {
@@ -635,17 +695,41 @@ export function DashboardLayoutEngine({ pageId, api }: DashboardLayoutEngineProp
       if (!documentRef.current) {
         return;
       }
-      const instanceId = newWidgetInstanceId();
-      const instance = createInstanceFromCatalog(entry, instanceId);
-      const next = addWidgetToLayout(documentRef.current, instance, entry.defaultLayout);
-      commitDocument(next, { recordUndoFrom: documentRef.current });
-      setSelectedId(instanceId);
+      const previous = documentRef.current;
+      const request = createRequestFromCatalog(entry);
       setLibraryOpen(false);
-      if (shouldOpenSettingsAfterAdd(entry)) {
-        setSettingsWidgetId(instanceId);
-      }
+      setSaveStatus("saving");
+      setSaveError(null);
+
+      void (async () => {
+        try {
+          const response = await api.createPageWidget(pageIdRef.current, request);
+          const applied = applyServerLayout(response, { recordUndoFrom: previous });
+          if (!applied) {
+            return;
+          }
+          setSelectedId(response.widget.id);
+          if (shouldOpenSettingsAfterAdd(entry)) {
+            setSettingsWidgetId(response.widget.id);
+          }
+        } catch (error) {
+          if (import.meta.env?.DEV) {
+            console.error("[dashora:layout] createPageWidget failed", {
+              schema: error instanceof ZodError ? "ZodError" : "createPageWidget",
+              field: error instanceof ZodError ? error.issues[0]?.path.join(".") : undefined,
+              mutation: "createPageWidget",
+            });
+          }
+          setSaveStatus("error");
+          setSaveError(
+            error instanceof Error
+              ? error.message
+              : "Dashora could not create this widget because the server returned an invalid response.",
+          );
+        }
+      })();
     },
-    [commitDocument],
+    [api, applyServerLayout],
   );
 
   const saveWidgetSettings = useCallback(

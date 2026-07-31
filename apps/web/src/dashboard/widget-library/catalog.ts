@@ -1,9 +1,11 @@
-import type {
-  PageWidget,
-  PlaceholderTone,
-  PlaceholderWidget,
-  TypedWidgetInstance,
-  WidgetPlacementSize,
+import {
+  type CreatePageWidgetRequest,
+  type PageWidget,
+  type PlaceholderTone,
+  type PlaceholderWidget,
+  type TypedWidgetInstance,
+  type WidgetPlacementSize,
+  createDashoraUuid,
 } from "@dashora/shared";
 import {
   type AnyWidgetDefinition,
@@ -460,15 +462,34 @@ export function formatDefaultSize(size: WidgetPlacementSize): string {
   return `${size.colSpan}×${size.rowSpan}`;
 }
 
+/** Local UUID helper for duplicate/optimistic paths. Prefer server-minted ids on create. */
 export function newWidgetInstanceId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+  return createDashoraUuid();
+}
+
+/** Build a create-widget request from a catalog entry (no persistent instance id). */
+export function createRequestFromCatalog(entry: WidgetCatalogEntry): CreatePageWidgetRequest {
+  if (entry.kind === "placeholder") {
+    const defaults = entry.placeholderDefaults;
+    if (!defaults) {
+      throw new Error(`Placeholder catalog entry ${entry.id} is missing defaults`);
+    }
+    return {
+      kind: "placeholder",
+      title: defaults.title,
+      description: defaults.description,
+      tone: defaults.tone,
+      defaultLayout: entry.defaultLayout,
+    };
   }
-  return `a${Date.now().toString(16).padStart(11, "0")}-1111-4111-8111-${Math.floor(
-    Math.random() * 1e12,
-  )
-    .toString(16)
-    .padStart(12, "0")}`;
+  return {
+    kind: "widget",
+    type: entry.id,
+    title: entry.name,
+    config: structuredClone(entry.defaultConfig ?? {}),
+    schemaVersion: entry.schemaVersion ?? 1,
+    defaultLayout: entry.defaultLayout,
+  };
 }
 
 export {

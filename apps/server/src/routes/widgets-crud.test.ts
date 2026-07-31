@@ -1,7 +1,9 @@
 import {
   addWidgetToLayout,
   createDefaultPageLayout,
+  createPageWidgetResponseSchema,
   dashboardResponseSchema,
+  isDashoraUuid,
   pageLayoutResponseSchema,
   removeWidgetFromLayout,
   setupResponseSchema,
@@ -210,6 +212,155 @@ describe("typed widget CRUD via layout API", () => {
     const removedBody = pageLayoutResponseSchema.parse(removed.json());
     expect(removedBody.layout.widgets.some((widget) => widget.id === widgetId)).toBe(false);
     expect(removedBody.layout.layouts.lg.some((item) => item.i === widgetId)).toBe(false);
+  });
+
+  it("creates weather and rss widgets with distinct server-minted UUIDs", async () => {
+    await startAuthenticated();
+    const dashboard = dashboardResponseSchema.parse(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/v1/dashboard",
+          headers: { cookie: cookieHeader(authCookies) },
+        })
+      ).json(),
+    );
+    const home = dashboard.dashboard.pages.find((page) => page.slug === "home");
+    expect(home).toBeDefined();
+    if (!home) {
+      return;
+    }
+
+    const createPath = `/api/v1/dashboard/pages/${home.id}/widgets`;
+    const weather = await app.inject({
+      method: "POST",
+      url: createPath,
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(authCookies),
+        "x-csrf-token": csrfToken,
+      },
+      payload: {
+        kind: "widget",
+        type: "weather",
+        title: "Weather",
+        config: {},
+        schemaVersion: 1,
+        defaultLayout: { colSpan: 4, rowSpan: 2 },
+      },
+    });
+    expect(weather.statusCode).toBe(201);
+    const weatherBody = createPageWidgetResponseSchema.parse(weather.json());
+    expect(weatherBody.widget.kind).toBe("widget");
+    if (weatherBody.widget.kind !== "widget") {
+      return;
+    }
+    expect(isDashoraUuid(weatherBody.widget.id)).toBe(true);
+    expect(weatherBody.widget.id).not.toBe("weather");
+    expect(weatherBody.widget.type).toBe("weather");
+    expect(weatherBody.layout.layouts.lg.some((item) => item.i === weatherBody.widget.id)).toBe(
+      true,
+    );
+
+    const rss = await app.inject({
+      method: "POST",
+      url: createPath,
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(authCookies),
+        "x-csrf-token": csrfToken,
+      },
+      payload: {
+        kind: "widget",
+        type: "rss",
+        title: "RSS",
+        config: { feeds: [] },
+        schemaVersion: 1,
+        defaultLayout: { colSpan: 4, rowSpan: 3 },
+      },
+    });
+    expect(rss.statusCode).toBe(201);
+    const rssBody = createPageWidgetResponseSchema.parse(rss.json());
+    expect(rssBody.widget.kind).toBe("widget");
+    if (rssBody.widget.kind !== "widget") {
+      return;
+    }
+    expect(isDashoraUuid(rssBody.widget.id)).toBe(true);
+    expect(rssBody.widget.id).not.toBe(weatherBody.widget.id);
+    expect(rssBody.widget.type).toBe("rss");
+
+    const weatherAgain = await app.inject({
+      method: "POST",
+      url: createPath,
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(authCookies),
+        "x-csrf-token": csrfToken,
+      },
+      payload: {
+        kind: "widget",
+        type: "weather",
+        title: "Weather 2",
+        config: {},
+        schemaVersion: 1,
+        defaultLayout: { colSpan: 4, rowSpan: 2 },
+      },
+    });
+    expect(weatherAgain.statusCode).toBe(201);
+    const weatherAgainBody = createPageWidgetResponseSchema.parse(weatherAgain.json());
+    expect(weatherAgainBody.widget.id).not.toBe(weatherBody.widget.id);
+    expect(weatherAgainBody.widget.id).not.toBe("weather");
+
+    const persisted = pageLayoutResponseSchema.parse(
+      (
+        await app.inject({
+          method: "GET",
+          url: `/api/v1/dashboard/pages/${home.id}/layout`,
+          headers: { cookie: cookieHeader(authCookies) },
+        })
+      ).json(),
+    );
+    const ids = persisted.layout.widgets
+      .filter((widget) => widget.kind === "widget" && widget.type === "weather")
+      .map((widget) => widget.id);
+    expect(ids).toContain(weatherBody.widget.id);
+    expect(ids).toContain(weatherAgainBody.widget.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("rejects create requests that try to supply a client widget id", async () => {
+    await startAuthenticated();
+    const dashboard = dashboardResponseSchema.parse(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/v1/dashboard",
+          headers: { cookie: cookieHeader(authCookies) },
+        })
+      ).json(),
+    );
+    const home = dashboard.dashboard.pages[0];
+    expect(home).toBeDefined();
+    if (!home) {
+      return;
+    }
+
+    const rejected = await app.inject({
+      method: "POST",
+      url: `/api/v1/dashboard/pages/${home.id}/widgets`,
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(authCookies),
+        "x-csrf-token": csrfToken,
+      },
+      payload: {
+        kind: "widget",
+        id: "weather",
+        type: "weather",
+        defaultLayout: { colSpan: 4, rowSpan: 2 },
+      },
+    });
+    expect(rejected.statusCode).toBe(400);
   });
 
   it("rejects typed widgets with invalid type identifiers", async () => {
