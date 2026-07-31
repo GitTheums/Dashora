@@ -8,9 +8,9 @@ Dashora v1 stores durable state in a single SQLite database file under `DASHORA_
 | `$DASHORA_DATA_DIR/dashora.sqlite-wal` | Write-ahead log (present while WAL mode is active) |
 | `$DASHORA_DATA_DIR/dashora.sqlite-shm` | Shared-memory companion for WAL |
 
-Default `DASHORA_DATA_DIR` is `/data` so a Docker volume can mount persistence at `/data`. Local development typically sets `DASHORA_DATA_DIR=./data` (see `apps/server/.env.example`).
+Default `DASHORA_DATA_DIR` is `/data` so a Docker volume can mount persistence at `/data`. Local development typically sets `DASHORA_DATA_DIR=./data` (see `apps/server/.env.example`). With Compose, the named volume `dashora-data` (production) or `dashora-dev-data` (development) maps to `/data`; override with `DASHORA_DATA_BIND=./data`.
 
-Treat the data directory (and any future encryption-key material from the environment) as sensitive. Backups can contain hashed passwords, session token hashes, and encrypted secret ciphertext.
+Treat the data directory (and encryption-key material from the environment) as sensitive. Backups can contain hashed passwords, session token hashes, and encrypted secret ciphertext.
 
 ## Backup (recommended)
 
@@ -19,36 +19,55 @@ Treat the data directory (and any future encryption-key material from the enviro
    - `dashora.sqlite`
    - `dashora.sqlite-wal` and `dashora.sqlite-shm` if they exist (or checkpoint/stop first so only the main file remains)
 3. Store the archive offline with the same care as production secrets.
-4. Also record deployment env that is **not** in SQLite (for example future secret-encryption keys). Restoring the DB without the matching key leaves secrets undecryptable.
+4. Also record deployment env that is **not** in SQLite (for example `SECRETS_ENCRYPTION_KEY`). Restoring the DB without the matching key leaves secrets undecryptable.
 
-### Consistent file copy while stopped
+### Consistent file copy while stopped (Compose)
 
 ```bash
-# Example: container volume at /data
+# From the repository root — service name is `dashora`
 docker compose stop dashora
-tar -czf dashora-backup-$(date -u +%Y%m%dT%H%M%SZ).tar.gz -C /var/lib/dashora data
+
+# Named volume example (Linux Docker host)
+docker run --rm \
+  -v dashora_dashora-data:/data:ro \
+  -v "$(pwd):/backup" \
+  alpine tar -czf "/backup/dashora-backup-$(date -u +%Y%m%dT%H%M%SZ).tar.gz" -C /data .
+
+# Bind mount example
+# tar -czf "dashora-backup-$(date -u +%Y%m%dT%H%M%SZ).tar.gz" -C ./data .
+
 docker compose start dashora
 ```
 
-Adjust host paths to match your volume mount.
+Adjust volume names if you set a custom Compose project name (`name:` in `compose.yaml` defaults to `dashora`, so the volume is typically `dashora_dashora-data`).
 
 ### Online backup with the SQLite CLI
 
-If you cannot stop the process, prefer an atomic SQLite backup over copying files mid-write:
+If you cannot stop the process and you have a bind-mounted data directory, prefer an atomic SQLite backup over copying files mid-write:
 
 ```bash
-sqlite3 /data/dashora.sqlite ".backup '/tmp/dashora-backup.sqlite'"
+sqlite3 ./data/dashora.sqlite ".backup './dashora-backup.sqlite'"
 ```
+
+For named volumes, stop the API briefly and archive the volume (recommended) so WAL companions stay consistent.
 
 ## Restore
 
-1. Stop Dashora completely.
+1. Stop Dashora completely (`docker compose stop dashora` or stop the standalone container).
 2. Replace the contents of `DASHORA_DATA_DIR` with the backup files (same filenames).
-3. Ensure file ownership/permissions allow only the Dashora service account to read/write.
+3. Ensure file ownership/permissions allow only the Dashora service account to read/write (Compose image uses UID/GID `10001`).
 4. Start Dashora. The server applies pending migrations on startup and fails closed if migration cannot run.
 5. Verify `GET /api/v1/health` and that you can authenticate once auth is enabled.
 
 Do **not** restore a WAL/SHM pair from a different generation than the main DB file. Prefer restoring a single consistent `.backup` snapshot or a full stopped-directory archive.
+
+### Restore ownership for the container user
+
+```bash
+# Bind mount example after extracting a backup into ./data
+docker run --rm -v "$(pwd)/data:/data" alpine chown -R 10001:10001 /data
+docker compose start dashora
+```
 
 ## What is not covered by the SQLite file alone
 
@@ -58,6 +77,7 @@ Do **not** restore a WAL/SHM pair from a different generation than the main DB f
 
 ## Related
 
+- [Upgrade procedure](./upgrade.md)
 - [ADR 0003 — SQLite and Drizzle](../docs/adr/0003-sqlite-drizzle.md)
 - [Architecture — database ownership](../docs/architecture.md)
 - [Security model — database and backups](../docs/security-model.md)

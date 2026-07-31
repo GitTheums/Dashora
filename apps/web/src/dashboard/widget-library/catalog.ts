@@ -14,11 +14,6 @@ import {
   type WidgetMetadata,
 } from "@dashora/widget-sdk";
 import {
-  DEMO_METRICS_DEFAULT_CONFIG,
-  DEMO_METRICS_WIDGET_ID,
-  demoMetricsDefinition,
-} from "@dashora/widget-sdk/examples/demo-metrics";
-import {
   BOOKMARKS_DEFAULT_CONFIG,
   BOOKMARKS_WIDGET_ID,
   bookmarksDefinition,
@@ -34,6 +29,11 @@ import {
   clockDefinition,
 } from "@dashora/widget-sdk/widgets/clock";
 import {
+  CUSTOM_API_DEFAULT_CONFIG,
+  CUSTOM_API_WIDGET_ID,
+  customApiDefinition,
+} from "@dashora/widget-sdk/widgets/custom-api";
+import {
   GITHUB_RELEASES_DEFAULT_CONFIG,
   GITHUB_RELEASES_WIDGET_ID,
   githubReleasesDefinition,
@@ -44,10 +44,30 @@ import {
   githubRepositoryDefinition,
 } from "@dashora/widget-sdk/widgets/github-repository";
 import {
+  HACKER_NEWS_DEFAULT_CONFIG,
+  HACKER_NEWS_WIDGET_ID,
+  hackerNewsDefinition,
+} from "@dashora/widget-sdk/widgets/hacker-news";
+import {
+  IFRAME_DEFAULT_CONFIG,
+  IFRAME_WIDGET_ID,
+  iframeDefinition,
+} from "@dashora/widget-sdk/widgets/iframe";
+import {
+  LOBSTERS_DEFAULT_CONFIG,
+  LOBSTERS_WIDGET_ID,
+  lobstersDefinition,
+} from "@dashora/widget-sdk/widgets/lobsters";
+import {
   MARKETS_DEFAULT_CONFIG,
   MARKETS_WIDGET_ID,
   marketsDefinition,
 } from "@dashora/widget-sdk/widgets/markets";
+import {
+  REDDIT_DEFAULT_CONFIG,
+  REDDIT_WIDGET_ID,
+  redditDefinition,
+} from "@dashora/widget-sdk/widgets/reddit";
 import { RSS_DEFAULT_CONFIG, RSS_WIDGET_ID, rssDefinition } from "@dashora/widget-sdk/widgets/rss";
 import {
   SEARCH_DEFAULT_CONFIG,
@@ -60,22 +80,38 @@ import {
   todoDefinition,
 } from "@dashora/widget-sdk/widgets/todo";
 import {
+  TWITCH_DEFAULT_CONFIG,
+  TWITCH_WIDGET_ID,
+  twitchDefinition,
+} from "@dashora/widget-sdk/widgets/twitch";
+import {
   WEATHER_DEFAULT_CONFIG,
   WEATHER_WIDGET_ID,
   weatherDefinition,
 } from "@dashora/widget-sdk/widgets/weather";
 import {
+  YOUTUBE_DEFAULT_CONFIG,
+  YOUTUBE_WIDGET_ID,
+  youtubeDefinition,
+} from "@dashora/widget-sdk/widgets/youtube";
+import {
   bookmarksMetadata,
   calendarMetadata,
   clockMetadata,
-  demoMetricsMetadata,
+  customApiMetadata,
   githubReleasesMetadata,
   githubRepositoryMetadata,
+  hackerNewsMetadata,
+  iframeMetadata,
+  lobstersMetadata,
   marketsMetadata,
+  redditMetadata,
   rssMetadata,
   searchMetadata,
   todoMetadata,
+  twitchMetadata,
   weatherMetadata,
+  youtubeMetadata,
 } from "../widgets/registry.js";
 
 export type CatalogEntryKind = "widget" | "placeholder";
@@ -274,18 +310,58 @@ const PRODUCTION_ENTRIES: WidgetCatalogEntry[] = [
     "Crypto, equities, and index watchlist",
     true,
   ),
+  catalogFromDefinition(
+    hackerNewsDefinition,
+    hackerNewsMetadata,
+    HACKER_NEWS_DEFAULT_CONFIG,
+    "Hacker News stories",
+  ),
+  catalogFromDefinition(
+    lobstersDefinition,
+    lobstersMetadata,
+    LOBSTERS_DEFAULT_CONFIG,
+    "Lobsters stories and tags",
+    true,
+  ),
+  catalogFromDefinition(
+    redditDefinition,
+    redditMetadata,
+    REDDIT_DEFAULT_CONFIG,
+    "Subreddit posts",
+    true,
+  ),
+  catalogFromDefinition(
+    youtubeDefinition,
+    youtubeMetadata,
+    YOUTUBE_DEFAULT_CONFIG,
+    "YouTube channel uploads",
+    true,
+  ),
+  catalogFromDefinition(
+    twitchDefinition,
+    twitchMetadata,
+    TWITCH_DEFAULT_CONFIG,
+    "Twitch channel live status",
+    true,
+  ),
+  catalogFromDefinition(
+    customApiDefinition,
+    customApiMetadata,
+    CUSTOM_API_DEFAULT_CONFIG,
+    "Server-side JSON API with safe templates",
+    true,
+  ),
+  catalogFromDefinition(
+    iframeDefinition,
+    iframeMetadata,
+    IFRAME_DEFAULT_CONFIG,
+    "Sandboxed https embed",
+    true,
+  ),
 ];
-
-const DEMO_ENTRY: WidgetCatalogEntry = catalogFromDefinition(
-  demoMetricsDefinition,
-  demoMetricsMetadata,
-  DEMO_METRICS_DEFAULT_CONFIG,
-  "Live demo metric value",
-);
 
 export const WIDGET_CATALOG: readonly WidgetCatalogEntry[] = [
   ...PRODUCTION_ENTRIES,
-  DEMO_ENTRY,
   ...PLACEHOLDER_ENTRIES,
 ];
 
@@ -406,5 +482,11 @@ export {
   GITHUB_REPOSITORY_WIDGET_ID,
   GITHUB_RELEASES_WIDGET_ID,
   MARKETS_WIDGET_ID,
-  DEMO_METRICS_WIDGET_ID,
+  HACKER_NEWS_WIDGET_ID,
+  LOBSTERS_WIDGET_ID,
+  REDDIT_WIDGET_ID,
+  YOUTUBE_WIDGET_ID,
+  TWITCH_WIDGET_ID,
+  CUSTOM_API_WIDGET_ID,
+  IFRAME_WIDGET_ID,
 };

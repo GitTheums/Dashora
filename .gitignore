@@ -8,6 +8,7 @@ build/
 *.tsbuildinfo
 .vite/
 .turbo/
+.deploy-test/
 
 # Test / coverage
 coverage/

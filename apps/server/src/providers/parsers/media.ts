@@ -15,14 +15,7 @@ function isImageUrl(url: string): boolean {
  * Best-effort image URL from enclosure / Media RSS fields.
  * Callers must still sanitize before exposing to the browser.
  */
-export function extractMediaThumbnailUrl(node: XmlNode): string | undefined {
-  const enclosure = findChild(node, "enclosure");
-  const enclosureUrl = enclosure?.attributes["url"];
-  const enclosureType = enclosure?.attributes["type"];
-  if (enclosureUrl && (isImageType(enclosureType) || isImageUrl(enclosureUrl))) {
-    return enclosureUrl;
-  }
-
+function thumbnailFromNode(node: XmlNode): string | undefined {
   const thumbnail = findChild(node, "thumbnail");
   if (thumbnail?.attributes["url"]) {
     return thumbnail.attributes["url"];
@@ -38,6 +31,30 @@ export function extractMediaThumbnailUrl(node: XmlNode): string | undefined {
     const type = content.attributes["type"];
     if (medium === "image" || isImageType(type) || isImageUrl(url)) {
       return url;
+    }
+  }
+
+  return undefined;
+}
+
+export function extractMediaThumbnailUrl(node: XmlNode): string | undefined {
+  const enclosure = findChild(node, "enclosure");
+  const enclosureUrl = enclosure?.attributes["url"];
+  const enclosureType = enclosure?.attributes["type"];
+  if (enclosureUrl && (isImageType(enclosureType) || isImageUrl(enclosureUrl))) {
+    return enclosureUrl;
+  }
+
+  const direct = thumbnailFromNode(node);
+  if (direct) {
+    return direct;
+  }
+
+  // YouTube Atom and some Media RSS feeds nest thumbnails under media:group.
+  for (const group of findChildren(node, "group")) {
+    const nested = thumbnailFromNode(group);
+    if (nested) {
+      return nested;
     }
   }
 

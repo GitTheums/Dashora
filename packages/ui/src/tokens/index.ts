@@ -161,4 +161,4 @@ export const breakpoints = {
   "2xl": 1440,
 } as const;
 
-export type ThemeMode = "light" | "dark" | "system";
+export type { ThemeMode } from "@dashora/shared";

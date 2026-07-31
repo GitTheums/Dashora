@@ -13,6 +13,7 @@ import {
   type ProviderHttpClient,
   type ProviderHttpRequest,
   type ProviderHttpResponse,
+  type UrlValidationResult,
   createProviderHttpClient,
 } from "./http-client.js";
 import { createCacheMetrics } from "./metrics.js";
@@ -64,6 +65,10 @@ export type ProviderFetchOptions = {
   cachePolicy?: Partial<SwrCachePolicy>;
   /** Skip rate limiter (tests / internal). */
   skipRateLimit?: boolean;
+  /** SSRF / allow-list guard for the URL and redirects. */
+  validateUrl?: (
+    url: string,
+  ) => undefined | UrlValidationResult | Promise<undefined | UrlValidationResult>;
 };
 
 export type ProviderFetchResult = {
@@ -148,6 +153,7 @@ export function createProviderPlatform(options: ProviderPlatformOptions) {
       ...(input.signal !== undefined ? { signal: input.signal } : {}),
       ...(validators.etag ? { etag: validators.etag } : {}),
       ...(validators.lastModified ? { lastModified: validators.lastModified } : {}),
+      ...(input.validateUrl !== undefined ? { validateUrl: input.validateUrl } : {}),
     };
 
     const maxRetries = input.retry === false ? 0 : (input.maxRetries ?? 2);
@@ -253,8 +259,94 @@ export function createProviderPlatform(options: ProviderPlatformOptions) {
           };
         }
         if (lookup.status === "stale") {
-          cacheStatus = "stale";
-          stalePayload = lookup.payload;
+          // Return stale immediately; revalidate in the background (true SWR).
+          const revalidateKey = `revalidate:${cacheKey}`;
+          void deduper.dedupe(revalidateKey, async () => {
+            try {
+              const upstream = await executeUpstream(input, lookup.validators);
+              if (!swr || !cacheKey) {
+                return {
+                  response: upstream,
+                  cacheStatus: "miss" as const,
+                  fromCache: false,
+                  durationMs: 0,
+                };
+              }
+              if (upstream.notModified) {
+                await swr.touchNotModified(
+                  cacheKey,
+                  {
+                    kind: "http-response",
+                    url: lookup.payload.url,
+                    status: lookup.payload.status,
+                    headers: lookup.payload.headers,
+                    bodyText: lookup.payload.bodyText,
+                    ...(lookup.payload.etag ? { etag: lookup.payload.etag } : {}),
+                    ...(lookup.payload.lastModified
+                      ? { lastModified: lookup.payload.lastModified }
+                      : {}),
+                  },
+                  policy,
+                );
+              } else if (upstream.ok) {
+                await swr.store(
+                  cacheKey,
+                  {
+                    kind: "http-response",
+                    url: upstream.url,
+                    status: upstream.status,
+                    headers: upstream.headers,
+                    bodyText: upstream.bodyText,
+                    ...(upstream.etag ? { etag: upstream.etag } : {}),
+                    ...(upstream.lastModified ? { lastModified: upstream.lastModified } : {}),
+                  },
+                  policy,
+                );
+              }
+              circuitBreaker.recordSuccess(providerId);
+            } catch {
+              // Keep serving the previously returned stale payload.
+              circuitBreaker.recordFailure(providerId);
+            }
+            return {
+              response: {
+                url: lookup.payload.url,
+                status: lookup.payload.status,
+                ok: true,
+                headers: lookup.payload.headers,
+                bodyText: lookup.payload.bodyText,
+                redirected: false,
+                notModified: false,
+                ...(lookup.payload.etag ? { etag: lookup.payload.etag } : {}),
+                ...(lookup.payload.lastModified
+                  ? { lastModified: lookup.payload.lastModified }
+                  : {}),
+              },
+              cacheStatus: "stale" as const,
+              fromCache: true,
+              durationMs: 0,
+            };
+          });
+
+          circuitBreaker.recordSuccess(providerId);
+          const durationMs = Math.max(0, now() - started);
+          stats.recordSuccess(providerId, durationMs);
+          return {
+            response: {
+              url: lookup.payload.url,
+              status: lookup.payload.status,
+              ok: true,
+              headers: lookup.payload.headers,
+              bodyText: lookup.payload.bodyText,
+              redirected: false,
+              notModified: false,
+              ...(lookup.payload.etag ? { etag: lookup.payload.etag } : {}),
+              ...(lookup.payload.lastModified ? { lastModified: lookup.payload.lastModified } : {}),
+            },
+            cacheStatus: "stale",
+            fromCache: true,
+            durationMs,
+          };
         }
       } else if (input.forceRefresh) {
         metrics.record("bypass");
@@ -295,7 +387,7 @@ export function createProviderPlatform(options: ProviderPlatformOptions) {
               ...(stalePayload.etag ? { etag: stalePayload.etag } : {}),
               ...(stalePayload.lastModified ? { lastModified: stalePayload.lastModified } : {}),
             },
-            cacheStatus: cacheStatus === "stale" ? "stale" : "hit",
+            cacheStatus: "hit",
             fromCache: true,
             durationMs,
           };
@@ -322,7 +414,7 @@ export function createProviderPlatform(options: ProviderPlatformOptions) {
         stats.recordSuccess(providerId, durationMs);
         return {
           response: upstream,
-          cacheStatus: cacheStatus === "stale" ? "miss" : cacheStatus,
+          cacheStatus,
           fromCache: false,
           durationMs,
         };
@@ -398,12 +490,13 @@ export function createProviderPlatform(options: ProviderPlatformOptions) {
     return { feed: parseAtomXml(result.response.bodyText), result };
   }
 
-  function getDiagnostics(): ProviderDiagnosticsResponse {
+  async function getDiagnostics(): Promise<ProviderDiagnosticsResponse> {
+    const entryCount = options.cacheRepository ? await options.cacheRepository.count() : undefined;
     return providerDiagnosticsResponseSchema.parse({
       generatedAt: new Date(now()).toISOString(),
       cancelled: shutdownController.signal.aborted,
       platform: platformConfig,
-      cache: metrics.snapshot(),
+      cache: metrics.snapshot(entryCount),
       providers: stats.listDiagnostics(),
     });
   }

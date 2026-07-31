@@ -266,6 +266,35 @@ describe("auth and first-run setup", () => {
     expect(retry.statusCode).toBe(200);
   });
 
+  it("rejects a common/breached password with a specific message and does not consume the token", async () => {
+    const setup = await startApp();
+    const setupToken = requireSetupToken(setup.getPlaintextForTests());
+
+    const response = await completeSetup(setupToken, { password: "passwordpassword" });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: { code: "validation_error", message: expect.stringMatching(/common/i) },
+    });
+    expect((await db.repos.setupTokens.getActive())?.tokenHash).toBe(hashToken(setupToken));
+
+    const retry = await completeSetup(setupToken);
+    expect(retry.statusCode).toBe(200);
+  });
+
+  it("rejects a password built from the operator's own email", async () => {
+    const setup = await startApp();
+    const setupToken = requireSetupToken(setup.getPlaintextForTests());
+
+    const response = await completeSetup(setupToken, {
+      email: "operator@example.com",
+      password: "operator-1234-secret",
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: { code: "validation_error", message: expect.stringMatching(/email/i) },
+    });
+  });
+
   it("failed database transaction does not consume the token", async () => {
     const setup = await startApp();
     const setupToken = setup.getPlaintextForTests();
@@ -322,6 +351,95 @@ describe("auth and first-run setup", () => {
     const statuses = [a.statusCode, b.statusCode].sort();
     expect(statuses).toEqual([200, 409]);
     expect(await db.repos.users.count()).toBe(1);
+  });
+
+  it("records an audit event for a successful setup completion", async () => {
+    const setup = await startApp();
+    const response = await completeSetup(requireSetupToken(setup.getPlaintextForTests()));
+    expect(response.statusCode).toBe(200);
+
+    const events = await db.repos.auditEvents.listRecent();
+    const setupEvent = events.find((event) => event.event === "auth.setup.completed");
+    expect(setupEvent).toMatchObject({ success: true, actorEmail: "admin@example.com" });
+    expect(setupEvent?.actorUserId).toBeTruthy();
+    // Never leak secret material into audit metadata.
+    expect(JSON.stringify(events)).not.toContain("correct-horse-battery");
+  });
+
+  it("records failed login attempts with the attempted email, and successful ones with the user id", async () => {
+    const setup = await startApp();
+    await completeSetup(requireSetupToken(setup.getPlaintextForTests()));
+
+    const loginCsrf = await issueCsrf();
+    const failed = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(loginCsrf.cookies),
+        "x-csrf-token": loginCsrf.token,
+      },
+      payload: { email: "admin@example.com", password: "wrong-password-here" },
+    });
+    expect(failed.statusCode).toBe(401);
+
+    const successCsrf = await issueCsrf();
+    const success = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(successCsrf.cookies),
+        "x-csrf-token": successCsrf.token,
+      },
+      payload: { email: "admin@example.com", password: "correct-horse-battery" },
+    });
+    expect(success.statusCode).toBe(200);
+
+    const events = await db.repos.auditEvents.listRecent();
+    const failureEvent = events.find((event) => event.event === "auth.login.failure");
+    expect(failureEvent).toMatchObject({ success: false, actorEmail: "admin@example.com" });
+    expect(failureEvent?.actorUserId).toBeNull();
+
+    const successEvent = events.find((event) => event.event === "auth.login.success");
+    expect(successEvent).toMatchObject({ success: true, actorEmail: "admin@example.com" });
+    expect(successEvent?.actorUserId).toBeTruthy();
+
+    expect(JSON.stringify(events)).not.toContain("wrong-password-here");
+    expect(JSON.stringify(events)).not.toContain("correct-horse-battery");
+  });
+
+  it("records a logout audit event tied to the logged-out user", async () => {
+    const setup = await startApp();
+    await completeSetup(requireSetupToken(setup.getPlaintextForTests()));
+
+    const loginCsrf = await issueCsrf();
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/login",
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(loginCsrf.cookies),
+        "x-csrf-token": loginCsrf.token,
+      },
+      payload: { email: "admin@example.com", password: "correct-horse-battery" },
+    });
+    const sessionCookies = { ...loginCsrf.cookies, ...parseCookies(login) };
+
+    const logout = await app.inject({
+      method: "POST",
+      url: "/api/v1/auth/logout",
+      headers: {
+        cookie: cookieHeader(sessionCookies),
+        "x-csrf-token": sessionCookies[CSRF_COOKIE_NAME] ?? loginCsrf.token,
+      },
+    });
+    expect(logout.statusCode).toBe(200);
+
+    const events = await db.repos.auditEvents.listRecent();
+    const logoutEvent = events.find((event) => event.event === "auth.logout");
+    expect(logoutEvent).toMatchObject({ success: true, actorEmail: "admin@example.com" });
+    expect(logoutEvent?.actorUserId).toBeTruthy();
   });
 
   it("logs in, serves /me, and logs out", async () => {

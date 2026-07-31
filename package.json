@@ -1,6 +1,6 @@
 {
   "name": "dashora",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Dashora — a self-hosted personal dashboard",
   "license": "Apache-2.0",
@@ -19,12 +19,16 @@
     "format": "biome format --write .",
     "typecheck": "pnpm run build:packages && pnpm -r run typecheck",
     "test": "pnpm run build:packages && pnpm -r --filter @dashora/shared --filter @dashora/widget-sdk --filter @dashora/ui --filter @dashora/server --filter @dashora/web run test",
+    "test:coverage": "pnpm run build:packages && pnpm -r --filter @dashora/shared --filter @dashora/widget-sdk --filter @dashora/server run test:coverage",
     "test:e2e": "pnpm --filter @dashora/web run test:e2e",
+    "test:container": "node ./scripts/container-smoke.mjs",
+    "analyze:web": "pnpm --filter @dashora/web run analyze",
     "clean": "pnpm -r run clean"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.13.10",
+    "@vitest/coverage-v8": "^3.0.9",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
   }

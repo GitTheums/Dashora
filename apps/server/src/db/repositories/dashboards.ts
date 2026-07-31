@@ -16,6 +16,8 @@ export type NewDashboardInput = {
 export type UpdateDashboardInput = {
   name?: string;
   slug?: string;
+  /** Pass `null` to clear; omit to leave unchanged. */
+  themeJson?: string | null;
   updatedAt?: number;
 };
 
@@ -63,6 +65,7 @@ export function createDashboardsRepository(db: DashoraDatabase) {
         .set({
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.slug !== undefined ? { slug: input.slug } : {}),
+          ...(input.themeJson !== undefined ? { themeJson: input.themeJson } : {}),
           updatedAt: input.updatedAt ?? nowEpochMillis(),
         })
         .where(eq(dashboards.id, id))

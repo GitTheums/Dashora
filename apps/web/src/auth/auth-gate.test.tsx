@@ -75,16 +75,31 @@ describe("AuthGate", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: "Dashora home" })).toBeTruthy();
     });
-    expect(screen.getByText("Signed in as Admin")).toBeTruthy();
-    expect(screen.getByText("Signed in as Admin").closest(".app-header__session")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Sign out" }).closest(".app-header__session"),
-    ).toBeTruthy();
+    expect(screen.queryByText(/Signed in as/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
     expect(
       screen
         .getByRole("navigation", { name: "Dashboard pages" })
         .closest(".app-header__nav-sticky"),
     ).toBeTruthy();
+  });
+
+  it("exposes account details and sign out under Settings", async () => {
+    window.history.replaceState({}, "", "/settings/account");
+    renderGate(
+      createMockApi({
+        getMe: vi.fn(async () => sampleUser),
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Account" })).toBeTruthy();
+    });
+    expect(screen.getByText("Admin")).toBeTruthy();
+    expect(screen.getByText("admin@example.com")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Account" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
 
   it("shows a signed-out unreachable state when the API is down", async () => {

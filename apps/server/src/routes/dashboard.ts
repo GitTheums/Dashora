@@ -1,11 +1,13 @@
 import {
   createPageRequestSchema,
   dashboardResponseSchema,
+  dashboardThemeResponseSchema,
   deletePageResponseSchema,
   pageLayoutResponseSchema,
   pageResponseSchema,
   reorderPagesRequestSchema,
   savePageLayoutRequestSchema,
+  updateDashboardThemeRequestSchema,
   updatePageRequestSchema,
 } from "@dashora/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -59,6 +61,34 @@ export async function registerDashboardRoutes(
     }
     const dashboard = await dashboards.getOrCreateDefaultDashboard(auth.user.id);
     return dashboardResponseSchema.parse({ dashboard });
+  });
+
+  app.patch("/api/v1/dashboard/theme", async (request, reply) => {
+    if (!(await requireCsrf(request, reply))) {
+      return;
+    }
+    const auth = await sessions.resolveSession(request, reply);
+    if (!auth) {
+      return sendApiError(reply, 401, "unauthenticated", "Authentication required");
+    }
+
+    const parsed = updateDashboardThemeRequestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return sendApiError(reply, 400, "validation_error", "Invalid dashboard theme payload");
+    }
+
+    try {
+      const themeOverride = await dashboards.updateThemeOverride(
+        auth.user.id,
+        parsed.data.themeOverride,
+      );
+      return dashboardThemeResponseSchema.parse({ themeOverride });
+    } catch (error) {
+      if (error instanceof DashboardServiceError) {
+        return sendApiError(reply, serviceErrorStatus(error.code), error.code, error.message);
+      }
+      throw error;
+    }
   });
 
   app.post("/api/v1/dashboard/pages", async (request, reply) => {

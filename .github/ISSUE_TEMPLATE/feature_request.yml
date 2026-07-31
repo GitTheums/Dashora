@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest an enhancement for Dashora
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem you want solved. Dashora is a single-operator personal dashboard — keep requests in that scope (see `docs/product-vision.md`).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should Dashora behave if this existed?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds or other approaches you tried.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Widgets
+        - Dashboard / layout
+        - Auth / security
+        - Themes / UI
+        - Backup / import-export
+        - Docker / packaging
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: originality
+    attributes:
+      label: Originality
+      options:
+        - label: I am not requesting that Dashora copy Glance (or another dashboard) source, templates, assets, naming, CSS, or documentation
+          required: true

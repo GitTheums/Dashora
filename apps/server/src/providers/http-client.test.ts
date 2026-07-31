@@ -148,4 +148,57 @@ describe("provider HTTP client", () => {
     controller.abort();
     await expect(pending).rejects.toMatchObject({ code: expect.stringMatching(/abort|cancelled/) });
   });
+
+  it("pins the connection to validateUrl's resolved address (DNS-rebinding protection)", async () => {
+    upstream = await startMockUpstream((_req, res) => {
+      res.statusCode = 200;
+      res.end("pinned-ok");
+    });
+    const port = new URL(upstream.baseUrl).port;
+
+    const client = createProviderHttpClient({
+      userAgent: "Dashora-Test/1.0",
+      connectTimeoutMs: 1_000,
+      requestTimeoutMs: 2_000,
+      maxResponseBytes: 10_000,
+      maxRedirects: 1,
+    });
+
+    // "localhost" is not a literal IP, so the underlying connector must go through our custom
+    // lookup rather than short-circuiting — this proves the pinned address is actually used to
+    // connect, not just recorded.
+    const response = await client.request({
+      url: `http://localhost:${port}/pinned`,
+      validateUrl: async () => ({ addresses: ["127.0.0.1"] }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.bodyText).toBe("pinned-ok");
+  });
+
+  it("fails the connection when the pinned address does not actually serve the host", async () => {
+    upstream = await startMockUpstream((_req, res) => {
+      res.statusCode = 200;
+      res.end("should-not-be-reached");
+    });
+    const port = new URL(upstream.baseUrl).port;
+
+    const client = createProviderHttpClient({
+      userAgent: "Dashora-Test/1.0",
+      connectTimeoutMs: 1_000,
+      requestTimeoutMs: 2_000,
+      maxResponseBytes: 10_000,
+      maxRedirects: 1,
+    });
+
+    // Even though real DNS for "localhost" would resolve to 127.0.0.1 (where the upstream is
+    // actually listening), the pinned dispatcher must only ever use the address we hand it —
+    // proving it overrides resolution rather than falling back to it.
+    await expect(
+      client.request({
+        url: `http://localhost:${port}/pinned`,
+        validateUrl: async () => ({ addresses: ["127.0.0.2"] }),
+      }),
+    ).rejects.toBeInstanceOf(ProviderError);
+  });
 });

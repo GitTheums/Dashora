@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/GitTheums/Dashora/security/advisories/new
+    about: Report a security issue privately via GitHub Security Advisories (see SECURITY.md).
+  - name: Documentation
+    url: https://github.com/GitTheums/Dashora/blob/main/docs/README.md
+    about: Operator and contributor documentation index.

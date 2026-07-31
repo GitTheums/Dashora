@@ -11,6 +11,12 @@ export type TestServerEnv = Pick<
   | "SETUP_TOKEN_TTL_MS"
   | "LOGIN_RATE_LIMIT_MAX"
   | "LOGIN_RATE_LIMIT_WINDOW_MS"
+  | "SETUP_RATE_LIMIT_MAX"
+  | "SETUP_RATE_LIMIT_WINDOW_MS"
+  | "API_RATE_LIMIT_MAX"
+  | "API_RATE_LIMIT_WINDOW_MS"
+  | "HSTS_MAX_AGE_SECONDS"
+  | "MAX_BODY_BYTES"
   | "PUBLIC_BASE_URL"
   | "PORT"
   | "PROVIDER_USER_AGENT"
@@ -28,6 +34,11 @@ export type TestServerEnv = Pick<
   | "GITHUB_TOKEN"
   | "COINGECKO_API_KEY"
   | "FINNHUB_API_KEY"
+  | "REDDIT_CLIENT_ID"
+  | "REDDIT_CLIENT_SECRET"
+  | "TWITCH_CLIENT_ID"
+  | "TWITCH_CLIENT_SECRET"
+  | "BACKUP_IMPORT_MAX_BYTES"
 >;
 
 export function createTestServerEnv(overrides: Partial<TestServerEnv> = {}): TestServerEnv {
@@ -41,8 +52,14 @@ export function createTestServerEnv(overrides: Partial<TestServerEnv> = {}): Tes
     SETUP_TOKEN_TTL_MS: 60 * 60 * 1000,
     LOGIN_RATE_LIMIT_MAX: 100,
     LOGIN_RATE_LIMIT_WINDOW_MS: 60_000,
+    SETUP_RATE_LIMIT_MAX: 100,
+    SETUP_RATE_LIMIT_WINDOW_MS: 60_000,
+    API_RATE_LIMIT_MAX: 1_000,
+    API_RATE_LIMIT_WINDOW_MS: 60_000,
+    HSTS_MAX_AGE_SECONDS: 15_552_000,
+    MAX_BODY_BYTES: 1_000_000,
     PORT: 3000,
-    PROVIDER_USER_AGENT: "Dashora/0.1.0-test (+https://github.com/dashora/dashora)",
+    PROVIDER_USER_AGENT: "Dashora/0.1.0-test (+https://github.com/GitTheums/Dashora)",
     PROVIDER_CONNECT_TIMEOUT_MS: 2_000,
     PROVIDER_REQUEST_TIMEOUT_MS: 5_000,
     PROVIDER_MAX_RESPONSE_BYTES: 1_000_000,
@@ -54,6 +71,7 @@ export function createTestServerEnv(overrides: Partial<TestServerEnv> = {}): Tes
     PROVIDER_CACHE_TTL_SECONDS: 60,
     PROVIDER_CACHE_SWR_SECONDS: 300,
     SECRETS_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    BACKUP_IMPORT_MAX_BYTES: 8_000_000,
     ...overrides,
   };
 }

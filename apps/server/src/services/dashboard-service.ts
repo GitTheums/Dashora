@@ -3,6 +3,7 @@ import {
   DEFAULT_DASHBOARD_PAGES,
   DEFAULT_DASHBOARD_SLUG,
   type Dashboard,
+  type DashboardThemeOverride,
   type Page,
   type PageIcon,
   type PageLayoutDocument,
@@ -10,10 +11,22 @@ import {
   createDefaultPageLayout,
   pageIconSchema,
   pageLayoutDocumentSchema,
+  parseStoredDashboardThemeOverride,
 } from "@dashora/shared";
 import type { DashboardRecord } from "../db/repositories/dashboards.js";
 import type { Repositories } from "../db/repositories/index.js";
 import type { PageRecord } from "../db/repositories/pages.js";
+
+function readThemeOverride(record: DashboardRecord): DashboardThemeOverride | null {
+  if (!record.themeJson) {
+    return null;
+  }
+  try {
+    return parseStoredDashboardThemeOverride(JSON.parse(record.themeJson) as unknown);
+  } catch {
+    return null;
+  }
+}
 
 export function toPageDto(record: PageRecord): Page {
   const iconParsed = pageIconSchema.safeParse(record.icon);
@@ -36,6 +49,7 @@ export function toDashboardDto(record: DashboardRecord, pageRecords: PageRecord[
     name: record.name,
     slug: record.slug,
     pages: pageRecords.map(toPageDto),
+    themeOverride: readThemeOverride(record),
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
@@ -44,6 +58,10 @@ export function toDashboardDto(record: DashboardRecord, pageRecords: PageRecord[
 export type DashboardService = {
   /** Returns the owner's default dashboard, creating defaults when missing. */
   getOrCreateDefaultDashboard: (ownerUserId: string) => Promise<Dashboard>;
+  updateThemeOverride: (
+    ownerUserId: string,
+    themeOverride: DashboardThemeOverride | null,
+  ) => Promise<DashboardThemeOverride | null>;
   createPage: (
     ownerUserId: string,
     input: { name: string; slug: string; icon: PageIcon; accent?: string | null },
@@ -174,6 +192,16 @@ export function createDashboardService(repos: Repositories): DashboardService {
     async getOrCreateDefaultDashboard(ownerUserId) {
       const { dashboard, pages: pageRecords } = await requireOwnedDashboard(ownerUserId);
       return toDashboardDto(dashboard, pageRecords);
+    },
+
+    async updateThemeOverride(ownerUserId, themeOverride) {
+      const { dashboard } = await requireOwnedDashboard(ownerUserId);
+      const themeJson = themeOverride === null ? null : JSON.stringify(themeOverride);
+      const updated = await repos.dashboards.update(dashboard.id, { themeJson });
+      if (!updated) {
+        throw new DashboardServiceError("not_found", "Dashboard not found");
+      }
+      return readThemeOverride(updated);
     },
 
     async createPage(ownerUserId, input) {

@@ -10,38 +10,29 @@ afterEach(() => {
 });
 
 describe("App header stacking", () => {
-  it("keeps the account row in normal flow and navigation in the sticky container", async () => {
+  it("renders sticky navigation without a separate account utility row", async () => {
     const { container } = render(
       <ThemeProvider defaultMode="dark">
-        <App
-          appName="Dashora"
-          dashboardApi={createMemoryDashboardApi()}
-          session={{
-            displayName: "Thom",
-            onSignOut: () => undefined,
-          }}
-        />
+        <App appName="Dashora" dashboardApi={createMemoryDashboardApi()} />
       </ThemeProvider>,
     );
 
     await screen.findByRole("navigation", { name: "Dashboard pages" });
 
     const sticky = container.querySelector("header.app-header__nav-sticky");
-    expect(container.querySelector(".app-header__session")).toBeTruthy();
+    expect(container.querySelector(".app-header__session")).toBeNull();
+    expect(screen.queryByText(/Signed in as/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
     expect(sticky?.querySelector(".top-nav")).toBeTruthy();
-    expect(screen.getByText("Signed in as Thom").closest(".app-header__session")).toBeTruthy();
-    expect(screen.getByText("Signed in as Thom").closest(".app-header__nav-sticky")).toBeNull();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
     expect(
       screen
         .getByRole("navigation", { name: "Dashboard pages" })
         .closest(".app-header__nav-sticky"),
     ).toBeTruthy();
-
-    const content = container.querySelector("main.dash-shell__content");
-    expect(content?.contains(screen.getByText("Signed in as Thom"))).toBe(false);
   });
 
-  it("renders without a session row when unauthenticated shell props are used", async () => {
+  it("keeps sticky navigation available for the dashboard shell", async () => {
     const { container } = render(
       <ThemeProvider defaultMode="light">
         <App appName="Dashora" dashboardApi={createMemoryDashboardApi()} />
@@ -51,7 +42,6 @@ describe("App header stacking", () => {
     await waitFor(() => {
       expect(container.querySelector("header.app-header__nav-sticky")).toBeTruthy();
     });
-    expect(container.querySelector(".app-header__session")).toBeNull();
     expect(await screen.findByRole("navigation", { name: "Dashboard pages" })).toBeTruthy();
   });
 });

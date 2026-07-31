@@ -164,6 +164,11 @@ export function createCacheEntriesRepository(db: DashoraDatabase) {
         .returning({ id: cacheEntries.id });
       return result.length;
     },
+
+    async count(): Promise<number> {
+      const rows = await db.select({ id: cacheEntries.id }).from(cacheEntries);
+      return rows.length;
+    },
   };
 }
 

@@ -52,6 +52,8 @@ export const dashboards = sqliteTable(
       .references(() => users.id, { onDelete: "cascade", onUpdate: "cascade" }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    /** Optional per-dashboard theme override JSON; null inherits user preferences. */
+    themeJson: text("theme_json"),
     createdAt: epochMillis("created_at").notNull(),
     updatedAt: epochMillis("updated_at").notNull(),
   },
@@ -294,6 +296,38 @@ export const setupTokens = sqliteTable(
   ],
 );
 
+/**
+ * Security-relevant event trail: authentication, settings, integration, and backup changes.
+ * `actorUserId` is nullable to record pre-auth events (e.g. failed logins for an unknown/wrong
+ * email); `actorEmail` captures the attempted identity in that case. `metadataJson` must never
+ * contain secret values — only non-sensitive descriptive fields (see `audit-service.ts`).
+ */
+export const auditEvents = sqliteTable(
+  "audit_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => randomUUID()),
+    occurredAt: epochMillis("occurred_at").notNull(),
+    actorUserId: text("actor_user_id").references(() => users.id, {
+      onDelete: "set null",
+      onUpdate: "cascade",
+    }),
+    actorEmail: text("actor_email"),
+    event: text("event").notNull(),
+    success: integer("success", { mode: "boolean" }).notNull(),
+    ip: text("ip"),
+    /** Non-secret descriptive metadata only; validated/constructed by audit-service.ts. */
+    metadataJson: text("metadata_json"),
+    createdAt: epochMillis("created_at").notNull(),
+  },
+  (table) => [
+    index("audit_events_occurred_at_idx").on(table.occurredAt),
+    index("audit_events_actor_user_id_idx").on(table.actorUserId),
+    index("audit_events_event_idx").on(table.event),
+  ],
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   dashboards: many(dashboards),
@@ -362,6 +396,10 @@ export const todoItemsRelations = relations(todoItems, ({ one }) => ({
   owner: one(users, { fields: [todoItems.ownerUserId], references: [users.id] }),
 }));
 
+export const auditEventsRelations = relations(auditEvents, ({ one }) => ({
+  actor: one(users, { fields: [auditEvents.actorUserId], references: [users.id] }),
+}));
+
 /** Schema object passed to drizzle() for typed queries. */
 export const schema = {
   users,
@@ -377,6 +415,7 @@ export const schema = {
   settings,
   todoItems,
   setupTokens,
+  auditEvents,
   usersRelations,
   sessionsRelations,
   dashboardsRelations,
@@ -389,4 +428,5 @@ export const schema = {
   cacheEntriesRelations,
   settingsRelations,
   todoItemsRelations,
+  auditEventsRelations,
 };

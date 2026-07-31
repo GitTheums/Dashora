@@ -156,6 +156,7 @@
   --ds-radius-lg: 1rem;
   --ds-radius-xl: 1.25rem;
   --ds-radius-full: 9999px;
+  --ds-radius-card: var(--ds-radius-lg);
 
   /* Motion */
   --ds-duration-fast: 150ms;
@@ -163,6 +164,11 @@
   --ds-duration-slow: 220ms;
   --ds-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ds-easing-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Density scale (remapped by data-density) */
+  --ds-density-pad: var(--ds-space-4);
+  --ds-density-gap: var(--ds-space-3);
+  --ds-density-control: 2.25rem;
 
   /* Z-index */
   --ds-z-base: 0;
@@ -193,6 +199,86 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Density */
+html[data-density="compact"] {
+  --ds-space-1: 0.2rem;
+  --ds-space-2: 0.4rem;
+  --ds-space-3: 0.6rem;
+  --ds-space-4: 0.85rem;
+  --ds-space-5: 1.05rem;
+  --ds-space-6: 1.25rem;
+  --ds-text-md: 0.8125rem;
+  --ds-text-lg: 0.9375rem;
+  --ds-density-pad: 0.85rem;
+  --ds-density-gap: 0.6rem;
+  --ds-density-control: 2rem;
+}
+
+html[data-density="dense"] {
+  --ds-space-1: 0.15rem;
+  --ds-space-2: 0.3rem;
+  --ds-space-3: 0.45rem;
+  --ds-space-4: 0.65rem;
+  --ds-space-5: 0.85rem;
+  --ds-space-6: 1rem;
+  --ds-text-md: 0.75rem;
+  --ds-text-lg: 0.875rem;
+  --ds-density-pad: 0.65rem;
+  --ds-density-gap: 0.45rem;
+  --ds-density-control: 1.75rem;
+}
+
+/* Card radius preference */
+html[data-card-radius="sharp"] {
+  --ds-radius-sm: 0.125rem;
+  --ds-radius-md: 0.2rem;
+  --ds-radius-lg: 0.25rem;
+  --ds-radius-xl: 0.35rem;
+  --ds-radius-card: 0.25rem;
+}
+
+html[data-card-radius="soft"] {
+  --ds-radius-card: var(--ds-radius-lg);
+}
+
+html[data-card-radius="rounded"] {
+  --ds-radius-sm: 0.5rem;
+  --ds-radius-md: 0.75rem;
+  --ds-radius-lg: 1.15rem;
+  --ds-radius-xl: 1.5rem;
+  --ds-radius-card: 1.15rem;
+}
+
+/* Reduced transparency — solid surfaces, no glass mixes */
+html[data-reduced-transparency="true"] {
+  --ds-border: color-mix(in srgb, var(--ds-fg) 14%, var(--ds-surface-1));
+  --ds-border-strong: color-mix(in srgb, var(--ds-fg) 22%, var(--ds-surface-1));
+  --ds-overlay: var(--ds-canvas);
+  --ds-primary-muted: color-mix(in srgb, var(--ds-primary) 18%, var(--ds-surface-1));
+  --ds-secondary-muted: color-mix(in srgb, var(--ds-secondary) 18%, var(--ds-surface-1));
+  --ds-danger-muted: color-mix(in srgb, var(--ds-danger) 16%, var(--ds-surface-1));
+  --ds-success-muted: color-mix(in srgb, var(--ds-success) 16%, var(--ds-surface-1));
+  --ds-warning-muted: color-mix(in srgb, var(--ds-warning) 16%, var(--ds-surface-1));
+}
+
+html[data-reduced-transparency="true"] body {
+  background-image: none;
+}
+
+/* Ambient background toggle */
+html:not([data-ambient="true"]) body {
+  background-image: none;
 }
 
 *,
@@ -420,13 +506,15 @@ body {
 
 .ds-icon-button__glyph {
   display: inline-flex;
-  width: 1rem;
-  height: 1rem;
+  align-items: center;
+  justify-content: center;
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 .ds-icon-button__glyph > svg {
-  width: 100%;
-  height: 100%;
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -437,9 +525,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-3);
-  padding: var(--ds-space-4);
+  padding: var(--ds-density-pad, var(--ds-space-4));
   border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-lg);
+  border-radius: var(--ds-radius-card, var(--ds-radius-lg));
   background: var(--ds-surface-1);
   box-shadow: none;
   color: var(--ds-fg);

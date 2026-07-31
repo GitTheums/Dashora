@@ -177,6 +177,27 @@ async function mockAuthenticatedSession(page: Page) {
       body: JSON.stringify({ csrfToken: "test-csrf" }),
     });
   });
+  await page.route("**/api/v1/settings/theme", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        preferences: {
+          mode: "system",
+          preset: "midnight",
+          density: "comfortable",
+          cardRadius: "soft",
+          accent: "teal",
+          accentCustom: null,
+          reducedTransparency: false,
+          reducedMotion: false,
+          ambientBackground: true,
+          appName: null,
+          logoDataUrl: null,
+        },
+      }),
+    });
+  });
   await page.route("**/api/v1/dashboard", async (route) => {
     await route.fulfill({
       status: 200,
@@ -186,6 +207,7 @@ async function mockAuthenticatedSession(page: Page) {
           id: DASHBOARD_ID,
           name: "Dashboard",
           slug: "default",
+          themeOverride: null,
           pages,
           createdAt: now,
           updatedAt: now,

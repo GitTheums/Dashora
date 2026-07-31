@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Dashora dashboard dark theme placeholder">
+  <rect width="960" height="540" fill="#0f172a"/>
+  <rect x="32" y="28" width="896" height="48" rx="8" fill="#1e293b"/>
+  <text x="56" y="58" font-family="system-ui,sans-serif" font-size="18" fill="#e2e8f0">Dashora  dark theme (screenshot placeholder)</text>
+  <rect x="32" y="100" width="280" height="180" rx="10" fill="#1e293b" stroke="#334155"/>
+  <rect x="336" y="100" width="280" height="180" rx="10" fill="#1e293b" stroke="#334155"/>
+  <rect x="640" y="100" width="280" height="180" rx="10" fill="#1e293b" stroke="#334155"/>
+  <rect x="32" y="304" width="440" height="200" rx="10" fill="#1e293b" stroke="#334155"/>
+  <rect x="496" y="304" width="424" height="200" rx="10" fill="#1e293b" stroke="#334155"/>
+</svg>

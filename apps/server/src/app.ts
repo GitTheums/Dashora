@@ -1,21 +1,31 @@
 import type { ServerEnv } from "@dashora/shared";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
 import Fastify, { type FastifyInstance } from "fastify";
 import { createSessionService } from "./auth/session-service.js";
 import { type SetupService, createSetupService } from "./auth/setup-service.js";
 import type { OpenedDatabase } from "./db/client.js";
 import { type Repositories, createRepositories } from "./db/repositories/index.js";
+import { registerErrorHandler } from "./http/error-handler.js";
+import { registerRequestTiming } from "./http/request-timing.js";
 import { type ProviderPlatform, createProviderPlatform } from "./providers/platform.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerBackupRoutes } from "./routes/backup.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerIntegrationRoutes } from "./routes/integrations.js";
 import { registerProviderDiagnosticsRoutes } from "./routes/provider-diagnostics.js";
+import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerWidgetRoutes } from "./routes/widgets.js";
+import { createApiSecretService } from "./services/api-secret-service.js";
+import { type AuditService, createAuditService } from "./services/audit-service.js";
+import { createBackupService } from "./services/backup-service.js";
 import { type DashboardService, createDashboardService } from "./services/dashboard-service.js";
 import { createGithubIntegrationService } from "./services/github-integration-service.js";
 import { createIcsBasicAuthIntegrationService } from "./services/ics-basic-auth-service.js";
+import { createThemeSettingsService } from "./services/theme-settings-service.js";
 import { type TodoService, createTodoService } from "./services/todo-service.js";
 
 /** Paths scrubbed from structured logs — never emit secrets or session material. */
@@ -25,9 +35,16 @@ export const LOG_REDACT_PATHS = [
   'req.headers["set-cookie"]',
   'res.headers["set-cookie"]',
   "req.body.password",
+  "req.body.confirmPassword",
   "req.body.token",
+  "req.body.secret",
+  "req.body.clientSecret",
+  "req.body.value",
   "req.body.username",
   "req.body.csrfToken",
+  "req.body.headers",
+  "req.body.headers[*].value",
+  "req.body.widgets[*].config.headers[*].value",
 ];
 
 export type BuildAppOptions = {
@@ -43,6 +60,12 @@ export type BuildAppOptions = {
     | "SETUP_TOKEN_TTL_MS"
     | "LOGIN_RATE_LIMIT_MAX"
     | "LOGIN_RATE_LIMIT_WINDOW_MS"
+    | "SETUP_RATE_LIMIT_MAX"
+    | "SETUP_RATE_LIMIT_WINDOW_MS"
+    | "API_RATE_LIMIT_MAX"
+    | "API_RATE_LIMIT_WINDOW_MS"
+    | "HSTS_MAX_AGE_SECONDS"
+    | "MAX_BODY_BYTES"
     | "PUBLIC_BASE_URL"
     | "PORT"
     | "PROVIDER_USER_AGENT"
@@ -60,6 +83,11 @@ export type BuildAppOptions = {
     | "GITHUB_TOKEN"
     | "COINGECKO_API_KEY"
     | "FINNHUB_API_KEY"
+    | "REDDIT_CLIENT_ID"
+    | "REDDIT_CLIENT_SECRET"
+    | "TWITCH_CLIENT_ID"
+    | "TWITCH_CLIENT_SECRET"
+    | "BACKUP_IMPORT_MAX_BYTES"
   >;
   database?: OpenedDatabase;
   logger?: boolean | { level: string };
@@ -75,6 +103,7 @@ export type AppServices = {
   dashboards: DashboardService;
   todos: TodoService;
   providers: ProviderPlatform;
+  audit: AuditService;
 };
 
 declare module "fastify" {
@@ -106,6 +135,50 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
             },
           },
     trustProxy: options.env.TRUST_PROXY,
+    bodyLimit: options.env.MAX_BODY_BYTES,
+  });
+
+  if (options.env.TRUST_PROXY) {
+    app.log.warn(
+      "TRUST_PROXY is enabled — this must only run behind a reverse proxy that strips " +
+        "client-supplied X-Forwarded-For/X-Forwarded-Proto headers, otherwise rate limiting " +
+        "and audit-log IP addresses can be spoofed. See docs/security-model.md.",
+    );
+  }
+
+  registerErrorHandler(app);
+  registerRequestTiming(app);
+
+  // Dashora is a JSON API only (no HTML/static serving) — default-deny CSP and related
+  // headers. If a reverse proxy later serves the SPA build, it must set its own CSP with
+  // `script-src 'self'` / `style-src 'self' 'unsafe-inline'` (see docs/security-model.md).
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'none'"],
+      },
+    },
+    frameguard: { action: "deny" },
+    noSniff: true,
+    referrerPolicy: { policy: "no-referrer" },
+    permittedCrossDomainPolicies: { permittedPolicies: "none" },
+    crossOriginResourcePolicy: { policy: "same-origin" },
+    hsts:
+      options.env.COOKIE_SECURE === true ||
+      (options.env.COOKIE_SECURE === "auto" && options.env.NODE_ENV === "production")
+        ? { maxAge: options.env.HSTS_MAX_AGE_SECONDS, includeSubDomains: true }
+        : false,
+  });
+  app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header(
+      "Permissions-Policy",
+      "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()",
+    );
+    return payload;
   });
 
   await app.register(cors, {
@@ -115,6 +188,16 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   await app.register(cookie);
 
+  await app.register(rateLimit, {
+    global: true,
+    max: options.env.API_RATE_LIMIT_MAX,
+    timeWindow: options.env.API_RATE_LIMIT_WINDOW_MS,
+    hook: "preHandler",
+    errorResponseBuilder: () => ({
+      error: { code: "rate_limited", message: "Too many requests. Try again later." },
+    }),
+  });
+
   await registerHealthRoutes(app, { version: options.version });
 
   if (!options.database) {
@@ -122,6 +205,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   }
 
   const repos = createRepositories(options.database.db);
+  const audit = createAuditService(repos);
   const setup =
     options.setup ??
     createSetupService({
@@ -130,7 +214,13 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       nodeEnv: options.env.NODE_ENV,
     });
   const dashboards = createDashboardService(repos);
+  const themeSettings = createThemeSettingsService(repos);
   const todos = createTodoService(repos);
+  const backup = createBackupService({
+    repos,
+    db: options.database.db,
+    serverVersion: options.version,
+  });
   const providers =
     options.providers ??
     createProviderPlatform({
@@ -149,9 +239,31 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       ? { secretsEncryptionKey: options.env.SECRETS_ENCRYPTION_KEY }
       : {}),
   });
+  const apiSecrets = createApiSecretService({
+    repos,
+    ...(options.env.SECRETS_ENCRYPTION_KEY
+      ? { secretsEncryptionKey: options.env.SECRETS_ENCRYPTION_KEY }
+      : {}),
+  });
   const resolveGithubToken = () => options.env.GITHUB_TOKEN ?? null;
   const resolveCryptoApiKey = () => options.env.COINGECKO_API_KEY ?? null;
   const resolveEquitiesApiKey = () => options.env.FINNHUB_API_KEY ?? null;
+  const resolveRedditCredentials = () => {
+    const clientId = options.env.REDDIT_CLIENT_ID?.trim();
+    const clientSecret = options.env.REDDIT_CLIENT_SECRET?.trim();
+    if (!clientId || !clientSecret) {
+      return null;
+    }
+    return { clientId, clientSecret };
+  };
+  const resolveTwitchCredentials = () => {
+    const clientId = options.env.TWITCH_CLIENT_ID?.trim();
+    const clientSecret = options.env.TWITCH_CLIENT_SECRET?.trim();
+    if (!clientId || !clientSecret) {
+      return null;
+    }
+    return { clientId, clientSecret };
+  };
   const sessions = createSessionService({
     repos,
     sessionTtlMs: options.env.SESSION_TTL_MS,
@@ -160,7 +272,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     nodeEnv: options.env.NODE_ENV,
   });
 
-  app.decorate("dashora", { repos, setup, dashboards, todos, providers });
+  app.decorate("dashora", { repos, setup, dashboards, todos, providers, audit });
 
   app.addHook("onClose", async () => {
     providers.cancel();
@@ -174,28 +286,43 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     sessions,
     setup,
     dashboards,
+    audit,
     loginRateLimitMax: options.env.LOGIN_RATE_LIMIT_MAX,
     loginRateLimitWindowMs: options.env.LOGIN_RATE_LIMIT_WINDOW_MS,
+    setupRateLimitMax: options.env.SETUP_RATE_LIMIT_MAX,
+    setupRateLimitWindowMs: options.env.SETUP_RATE_LIMIT_WINDOW_MS,
     nodeEnv: options.env.NODE_ENV,
   });
 
   await registerDashboardRoutes(app, { sessions, dashboards });
+  await registerSettingsRoutes(app, { sessions, themeSettings, audit });
   await registerWidgetRoutes(app, {
     sessions,
     todos,
     providers,
     githubIntegrations,
     icsBasicAuthIntegrations,
+    apiSecrets,
     resolveGithubToken,
     resolveCryptoApiKey,
     resolveEquitiesApiKey,
+    resolveRedditCredentials,
+    resolveTwitchCredentials,
   });
   await registerIntegrationRoutes(app, {
     sessions,
     githubIntegrations,
     icsBasicAuthIntegrations,
+    apiSecrets,
+    audit,
   });
   await registerProviderDiagnosticsRoutes(app, { sessions, providers });
+  await registerBackupRoutes(app, {
+    sessions,
+    backup,
+    maxImportBytes: options.env.BACKUP_IMPORT_MAX_BYTES,
+    audit,
+  });
 
   return app;
 }

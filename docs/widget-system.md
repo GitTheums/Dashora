@@ -54,8 +54,6 @@ Dashora uses an **in-repo widget registry**, not a runtime plugin CDN.
 
 See [ADR 0004](./adr/0004-widget-registry.md).
 
-Reference example (not a production widget): `demo-metrics` via `@dashora/widget-sdk/examples/demo-metrics`.
-
 Production widgets: [Search, Clock, Bookmarks, Todo](./widgets/first-party.md) via `@dashora/widget-sdk/widgets/*`.
 
 ## Server vs client roles for a widget

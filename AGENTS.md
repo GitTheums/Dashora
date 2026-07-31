@@ -39,5 +39,9 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:coverage
 pnpm test:e2e
+pnpm test:container
 ```
+
+Docker: `compose.yaml` (local production), `compose.dev.yaml` (dev), image build in `infra/Dockerfile`.

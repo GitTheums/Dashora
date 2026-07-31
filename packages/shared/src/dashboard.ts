@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dashboardThemeOverrideSchema } from "./theme.js";
 
 /** Icon keys rendered by the web app; stored as plain strings on the server. */
 export const pageIconSchema = z.enum([
@@ -65,6 +66,7 @@ export const dashboardSchema = z.object({
   name: z.string().min(1).max(120),
   slug: z.string().min(1).max(64),
   pages: z.array(pageSchema),
+  themeOverride: dashboardThemeOverrideSchema.nullable(),
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),
 });

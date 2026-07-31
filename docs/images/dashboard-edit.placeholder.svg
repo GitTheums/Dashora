@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Dashora layout editor placeholder">
+  <rect width="960" height="540" fill="#f8fafc"/>
+  <rect x="32" y="28" width="896" height="48" rx="8" fill="#dbeafe"/>
+  <text x="56" y="58" font-family="system-ui,sans-serif" font-size="18" fill="#1e3a8a">Edit mode (screenshot placeholder)</text>
+  <rect x="32" y="100" width="220" height="160" rx="10" fill="#ffffff" stroke="#93c5fd" stroke-dasharray="6 4"/>
+  <rect x="272" y="100" width="340" height="160" rx="10" fill="#ffffff" stroke="#93c5fd" stroke-dasharray="6 4"/>
+  <rect x="632" y="100" width="288" height="160" rx="10" fill="#ffffff" stroke="#93c5fd" stroke-dasharray="6 4"/>
+  <rect x="32" y="284" width="896" height="220" rx="10" fill="#eff6ff" stroke="#93c5fd" stroke-dasharray="6 4"/>
+</svg>

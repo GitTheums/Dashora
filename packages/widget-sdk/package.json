@@ -8,14 +8,6 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./examples/demo-metrics": {
-      "types": "./dist/examples/demo-metrics/index.d.ts",
-      "import": "./dist/examples/demo-metrics/index.js"
-    },
-    "./examples/demo-metrics/server": {
-      "types": "./dist/examples/demo-metrics/server.d.ts",
-      "import": "./dist/examples/demo-metrics/server.js"
-    },
     "./widgets/search": {
       "types": "./dist/widgets/search/index.d.ts",
       "import": "./dist/widgets/search/index.js"
@@ -55,6 +47,34 @@
     "./widgets/markets": {
       "types": "./dist/widgets/markets/index.d.ts",
       "import": "./dist/widgets/markets/index.js"
+    },
+    "./widgets/hacker-news": {
+      "types": "./dist/widgets/hacker-news/index.d.ts",
+      "import": "./dist/widgets/hacker-news/index.js"
+    },
+    "./widgets/lobsters": {
+      "types": "./dist/widgets/lobsters/index.d.ts",
+      "import": "./dist/widgets/lobsters/index.js"
+    },
+    "./widgets/reddit": {
+      "types": "./dist/widgets/reddit/index.d.ts",
+      "import": "./dist/widgets/reddit/index.js"
+    },
+    "./widgets/youtube": {
+      "types": "./dist/widgets/youtube/index.d.ts",
+      "import": "./dist/widgets/youtube/index.js"
+    },
+    "./widgets/twitch": {
+      "types": "./dist/widgets/twitch/index.d.ts",
+      "import": "./dist/widgets/twitch/index.js"
+    },
+    "./widgets/custom-api": {
+      "types": "./dist/widgets/custom-api/index.d.ts",
+      "import": "./dist/widgets/custom-api/index.js"
+    },
+    "./widgets/iframe": {
+      "types": "./dist/widgets/iframe/index.d.ts",
+      "import": "./dist/widgets/iframe/index.js"
     },
     "./widgets/search/server": {
       "types": "./dist/widgets/search/server.d.ts",
@@ -96,6 +116,34 @@
       "types": "./dist/widgets/markets/server.d.ts",
       "import": "./dist/widgets/markets/server.js"
     },
+    "./widgets/hacker-news/server": {
+      "types": "./dist/widgets/hacker-news/server.d.ts",
+      "import": "./dist/widgets/hacker-news/server.js"
+    },
+    "./widgets/lobsters/server": {
+      "types": "./dist/widgets/lobsters/server.d.ts",
+      "import": "./dist/widgets/lobsters/server.js"
+    },
+    "./widgets/reddit/server": {
+      "types": "./dist/widgets/reddit/server.d.ts",
+      "import": "./dist/widgets/reddit/server.js"
+    },
+    "./widgets/youtube/server": {
+      "types": "./dist/widgets/youtube/server.d.ts",
+      "import": "./dist/widgets/youtube/server.js"
+    },
+    "./widgets/twitch/server": {
+      "types": "./dist/widgets/twitch/server.d.ts",
+      "import": "./dist/widgets/twitch/server.js"
+    },
+    "./widgets/custom-api/server": {
+      "types": "./dist/widgets/custom-api/server.d.ts",
+      "import": "./dist/widgets/custom-api/server.js"
+    },
+    "./widgets/iframe/server": {
+      "types": "./dist/widgets/iframe/server.d.ts",
+      "import": "./dist/widgets/iframe/server.js"
+    },
     "./widgets": {
       "types": "./dist/widgets/index.d.ts",
       "import": "./dist/widgets/index.js"
@@ -108,6 +156,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
@@ -130,6 +179,7 @@
     "@testing-library/react": "^16.2.0",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
+    "@vitest/coverage-v8": "^3.0.9",
     "jsdom": "^26.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -1,11 +1,12 @@
 {
   "name": "@dashora/web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "analyze": "node ./scripts/analyze-bundle.mjs",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
@@ -16,20 +17,24 @@
     "@dashora/shared": "workspace:*",
     "@dashora/ui": "workspace:*",
     "@dashora/widget-sdk": "workspace:*",
+    "lucide-react": "^1.27.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-grid-layout": "^2.2.4",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "^1.51.1",
     "@testing-library/react": "^16.2.0",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^26.0.0",
+    "rollup-plugin-visualizer": "^6.0.3",
     "typescript": "^5.8.2",
     "vite": "^6.2.2",
+    "vite-plugin-compression2": "^1.4.0",
     "vitest": "^3.0.9"
   }
 }

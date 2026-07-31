@@ -15,6 +15,7 @@ export const providerErrorCodeSchema = z.enum([
   "network_error",
   "invalid_url",
   "cancelled",
+  "ssrf_blocked",
   "unknown",
 ]);
 
@@ -49,6 +50,7 @@ export const providerCacheMetricsSchema = z.object({
   stores: z.number().int().nonnegative(),
   notModified: z.number().int().nonnegative(),
   entryCount: z.number().int().nonnegative().optional(),
+  hitRate: z.number().min(0).max(1).optional(),
 });
 
 export type ProviderCacheMetrics = z.infer<typeof providerCacheMetricsSchema>;

@@ -222,7 +222,6 @@ export function DashboardLayoutEngine({ pageId, api }: DashboardLayoutEngineProp
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [settingsWidgetId, setSettingsWidgetId] = useState<string | null>(null);
   const [settingsCloseRequestKey, setSettingsCloseRequestKey] = useState(0);
-  const [refreshTokens, setRefreshTokens] = useState<Record<string, number>>({});
   const [activeBreakpoint, setActiveBreakpoint] = useState<LayoutBreakpoint>(() =>
     resolveBreakpoint(typeof window === "undefined" ? 1200 : window.innerWidth),
   );
@@ -718,24 +717,6 @@ export function DashboardLayoutEngine({ pageId, api }: DashboardLayoutEngineProp
     [commitDocument],
   );
 
-  const refreshWidget = useCallback(
-    (widgetId: string) => {
-      if (!documentRef.current) {
-        return;
-      }
-      const next = updateWidgetInLayout(documentRef.current, widgetId, (widget) => ({
-        ...widget,
-        lastUpdatedAt: Date.now(),
-      }));
-      commitDocument(next, { recordUndoFrom: documentRef.current });
-      setRefreshTokens((prev) => ({
-        ...prev,
-        [widgetId]: (prev[widgetId] ?? 0) + 1,
-      }));
-    },
-    [commitDocument],
-  );
-
   if (loadState === "error") {
     return (
       <div className="dash-layout dash-layout--error" role="alert">
@@ -868,8 +849,6 @@ export function DashboardLayoutEngine({ pageId, api }: DashboardLayoutEngineProp
                   onToggleEnabled={() => toggleWidgetEnabled(widget.id)}
                   onRemove={() => removeWidget(widget.id)}
                   onResetConfig={() => resetConfig(widget.id)}
-                  onRefresh={() => refreshWidget(widget.id)}
-                  refreshToken={refreshTokens[widget.id] ?? 0}
                 />
               </div>
             ))}

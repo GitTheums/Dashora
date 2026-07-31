@@ -1,5 +1,12 @@
 /** Paths reserved by the auth/design-system shell — not used as page slugs in the URL. */
-export const RESERVED_PATHS = new Set(["login", "setup", "design-system", "api"]);
+export const RESERVED_PATHS = new Set([
+  "login",
+  "setup",
+  "design-system",
+  "settings",
+  "api",
+  "admin",
+]);
 
 export function pagePath(slug: string): string {
   return `/${slug}`;

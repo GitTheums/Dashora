@@ -13,6 +13,7 @@ const SAFE_MESSAGES: Record<ProviderErrorCode, string> = {
   circuit_open: "This provider is temporarily unavailable after repeated failures.",
   network_error: "A network error occurred while contacting the upstream provider.",
   invalid_url: "The provider URL is invalid.",
+  ssrf_blocked: "The request target is blocked by outbound network protections.",
   cancelled: "The request was cancelled because the server is shutting down.",
   unknown: "An unexpected provider error occurred.",
 };

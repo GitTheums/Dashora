@@ -36,9 +36,12 @@ export function createCacheMetrics() {
   }
 
   function snapshot(entryCount?: number): ProviderCacheMetrics {
+    const lookedUp = counters.hits + counters.stales + counters.misses;
+    const hitRate = lookedUp > 0 ? (counters.hits + counters.stales) / lookedUp : undefined;
     return {
       ...counters,
       ...(entryCount !== undefined ? { entryCount } : {}),
+      ...(hitRate !== undefined ? { hitRate } : {}),
     };
   }
 

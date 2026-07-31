@@ -192,6 +192,128 @@ Server env (never sent to the browser):
 
 If symbols need an adapter whose key is missing, the widget returns `configuration-required` with a clear message instead of crashing. Quotes use the provider platform SWR cache (60s for live prices, longer for history) with rate-limit handling. Market-closed state is shown for equities/indexes when Finnhub reports the exchange is closed. Stale fetches surface a banner plus the last-good timestamp.
 
+## Hacker News (`hacker-news`)
+
+Stories from the official Hacker News Firebase API (no API key).
+
+| Setting | Behavior |
+| --- | --- |
+| Feed | `top`, `new`, `best`, `ask`, `show`, or `jobs` |
+| Max items | 1–50 (default 15) |
+| Layout | `compact` or `rich` |
+| Score / comments | Optional meta rows with safe HN discussion links |
+
+Outbound story links use `noopener noreferrer` when opening in a new tab. Relative publish times update on the client.
+
+## Lobsters (`lobsters`)
+
+Hottest, newest, active, and tag JSON feeds from lobste.rs with per-source failure isolation.
+
+| Setting | Behavior |
+| --- | --- |
+| Sources | Up to 10 feeds (`hottest` / `newest` / `active` / `tag`) |
+| Tag | Required when source kind is `tag` |
+| Item limits | Per-source limit plus global max items |
+| Layout | `compact` or `rich` |
+
+If some sources fail, remaining stories still show in a `stale` state.
+
+## Reddit (`reddit`)
+
+Subreddit listings via Reddit’s official OAuth API (application-only client credentials).
+
+| Setting | Behavior |
+| --- | --- |
+| Subreddits | Up to 10 names with sort (`hot` / `new` / `top` / `rising`) |
+| Top time frame | Optional for `top` sort |
+| Item limits | Per-subreddit limit plus global max items |
+| Thumbnails | Optional; placeholder values like `self` / `nsfw` are skipped |
+| Layout | `compact` or `rich` |
+
+Server env (never sent to the browser):
+
+| Variable | Purpose |
+| --- | --- |
+| `REDDIT_CLIENT_ID` | Reddit app client id |
+| `REDDIT_CLIENT_SECRET` | Reddit app client secret |
+
+Missing credentials or rejected keys return `configuration-required` / clear forbidden messages. Per-subreddit failures are isolated.
+
+## YouTube (`youtube`)
+
+Channel uploads from the official YouTube Atom feed (`feeds/videos.xml?channel_id=…`). No API key.
+
+| Setting | Behavior |
+| --- | --- |
+| Channels | Up to 10 YouTube channel ids (`UC…`) |
+| Item limits | Per-channel limit plus global max items |
+| Thumbnails | From Atom `media:thumbnail` when present |
+| Layout | `compact` or `rich` |
+
+Per-channel failures are isolated. Invalid or blocked channel feeds surface clear error messaging without taking down other channels.
+
+## Custom API (`custom-api`)
+
+Server-side `GET`/`POST` against a JSON HTTP API. Responses are mapped into a fixed presentation model (text, metric, list, progress, or status). No arbitrary JavaScript, HTML, or server templates.
+
+| Setting | Behavior |
+| --- | --- |
+| URL / method | Absolute `http(s)` URL; credentials must not be embedded in the URL |
+| Headers | Allow-listed names; values may be literals or `api-secret` references |
+| Body | Optional JSON string for `POST` |
+| Template + paths | Limited JSON paths such as `data.value` or `items[0].title` |
+| Timeout | 1–30 seconds (default 10s) |
+| Private network | Opt-in SSRF bypass for trusted LAN / private targets |
+| Preview | Settings “Test request” calls the preview API without exposing secrets |
+
+Secrets are stored via the API secret integration (encrypted at rest). Preview and widget payloads never include secret values or sensitive header contents.
+
+| Method | Path |
+| --- | --- |
+| `POST` | `/api/v1/widgets/custom-api/preview` |
+| `GET` | `/api/v1/integrations/api-secret` |
+| `POST` | `/api/v1/integrations/api-secret` |
+| `PATCH` | `/api/v1/integrations/api-secret/:id` |
+| `DELETE` | `/api/v1/integrations/api-secret/:id` |
+
+See [Security model](../security-model.md#custom-api-widget) for SSRF, redaction, and presentation constraints.
+
+## iFrame (`iframe`)
+
+Sandboxed https embed with optional host allow list and aspect ratio. Not a plugin runtime — no host `postMessage` API.
+
+| Setting | Behavior |
+| --- | --- |
+| URL | https only; no credentials; no localhost |
+| Allow list | Optional hostnames (`example.com`, `*.trusted.example`) |
+| Aspect ratio | `16:9`, `4:3`, `1:1`, `21:9`, `3:4`, or custom |
+| Sandbox | Restrictive by default; scripts / same-origin / forms / popups are opt-in |
+| Embedding warning | Server probe warns when `X-Frame-Options` / CSP `frame-ancestors` refuse framing |
+
+Dashora does not relax the main application Content Security Policy globally for embeds. Prefer tight allow lists and minimal sandbox tokens.
+
+See [Security model](../security-model.md#iframe-widget).
+
+## Twitch (`twitch`)
+
+Live status and stream metadata for configured channel logins via the Twitch Helix API.
+
+| Setting | Behavior |
+| --- | --- |
+| Channels | Up to 20 logins |
+| Offline channels | Optional; when off, only live channels are listed |
+| Thumbnails | Helix preview URLs with sanitized `http(s)` only |
+| Layout | `compact` or `rich` |
+
+Server env (never sent to the browser):
+
+| Variable | Purpose |
+| --- | --- |
+| `TWITCH_CLIENT_ID` | Twitch app client id |
+| `TWITCH_CLIENT_SECRET` | Twitch app client secret |
+
+Missing or rejected credentials return `configuration-required` with an operator-safe message. Tokens never appear in browser payloads.
+
 ## Registry wiring
 
 | App | Location |
@@ -205,6 +327,13 @@ If symbols need an adapter whose key is missing, the widget returns `configurati
 | GitHub adapter | `apps/server/src/providers/github/api.ts` |
 | Markets crypto adapter | `apps/server/src/providers/markets/coingecko.ts` |
 | Markets equities adapter | `apps/server/src/providers/markets/finnhub.ts` |
+| Hacker News adapter | `apps/server/src/providers/hacker-news/api.ts` |
+| Lobsters adapter | `apps/server/src/providers/lobsters/api.ts` |
+| Reddit adapter | `apps/server/src/providers/reddit/api.ts` |
+| YouTube adapter | `apps/server/src/providers/youtube/api.ts` |
+| Twitch adapter | `apps/server/src/providers/twitch/api.ts` |
+| Custom API adapter | `apps/server/src/providers/custom-api/api.ts` |
+| iFrame embed probe | `apps/server/src/providers/iframe/embed-probe.ts` |
 | Todo persistence | `todo_items` table + `apps/server/src/db/repositories/todo-items.ts` |
 
 ## Accessibility

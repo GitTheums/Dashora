@@ -2,48 +2,44 @@
 
 This roadmap is directional. Dates are intentionally absent; milestones complete when acceptance criteria land in `main`.
 
-## Now — foundation (complete / in progress)
+## Version 1.0 — usable personal dashboard (shipped)
+
+Acceptance theme: an operator can log in, arrange widgets on a page, configure credentials on the server, and see live-or-stale data safely.
 
 - [x] pnpm monorepo with `apps/web`, `apps/server`, shared packages
 - [x] Health API, env validation, CI, agent rules
 - [x] Architecture documentation set (this folder)
 - [x] SQLite + Drizzle schema and migration runner
-- [ ] Session authentication
-- [ ] Page + 12-column layout persistence APIs
-- [x] Widget SDK contracts, registries, and `demo-metrics` developer example
-- [x] First-party widgets: Search, Clock, Bookmarks, Todo (see [First-party widgets](./widgets/first-party.md))
-- [ ] Widget registry wiring end-to-end for remote/provider widgets beyond local config + Todo API
-
-## Version 1 — usable personal dashboard
-
-Acceptance theme: an operator can log in, arrange widgets on a page, configure credentials on the server, and see live-or-stale data safely.
-
-- Local session auth and secure cookies
-- Dashboard page CRUD and layout editor
-- First-party widget set (small but real): for example clock/bookmarks, RSS, weather, and one HTTP health/status widget
-- Server-side secrets API with redacted reads
-- Cache + stale-while-revalidate for remote widgets
-- Light/dark themes across shells and widgets
-- Unit tests for new routes; smoke e2e for login + dashboard render
-- Container packaging under `infra/` for single-host deploy
+- [x] Local session auth and secure cookies (first-run setup token)
+- [x] Dashboard page CRUD and 12-column layout editor
+- [x] Widget SDK contracts, registries, and end-to-end provider wiring
+- [x] First-party widgets: Search, Clock, Bookmarks, Todo, Weather, RSS, Calendar, GitHub Repository/Releases, Markets, Hacker News, Lobsters, Reddit, YouTube, Twitch, Custom API, iFrame
+- [x] Server-side secrets API with redacted reads
+- [x] Cache + stale-while-revalidate for remote widgets
+- [x] Light/dark themes and appearance settings
+- [x] Config import/export (Settings → Backup)
+- [x] Unit/integration tests, Playwright e2e/a11y/visual, container smoke
+- [x] Container packaging under `infra/` + Compose + GHCR multi-arch publish
 
 Out of scope reminders: third-party JS plugins, Rackora inventory features, SaaS multi-tenant.
 
+See [CHANGELOG.md](../CHANGELOG.md) for the v1.0.0 release notes.
+
 ## Version 1.x — deepen the core
 
-- Additional first-party widgets driven by operator demand
+- Additional first-party widgets driven by operator demand (for example HTTP health/status)
 - Optional OIDC / reverse-proxy auth documentation and support
-- Backup / restore guidance and optional helpers
+- Backup / restore polish and optional helpers
 - Richer empty/error copy and configuration wizards
 - Performance passes on cache hit rates and layout editor UX
-- Hardened CSP and security headers defaults
+- Further CSP and security-header hardening for SPA-serving deployments
+- MFA / password-change / session-revocation (see [SECURITY.md](../SECURITY.md))
 
 ## Version 2 — deliberate extensibility
 
-Only after v1 is solid and an ADR revisits the plugin policy:
+Only after v1.x is solid and an ADR revisits the plugin policy:
 
 - Capability-restricted extension mechanism (not raw `eval` plugins)
-- Import/export of dashboard definitions
 - Multi-page navigation polish and shared widget presets
 - Stronger multi-user roles if real demand exists
 

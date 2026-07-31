@@ -63,9 +63,17 @@ export {
 export {
   ThemeProvider,
   useTheme,
-  type ResolvedTheme,
+  type ThemeBranding,
   type ThemeProviderProps,
 } from "./theme-provider.js";
+export {
+  applyThemeAppearance,
+  buildAppearanceTokens,
+  resolveThemeMode,
+} from "./theme/apply-appearance.js";
+export { getPresetTokens, THEME_PRESETS } from "./theme/presets.js";
+export { getAccentSwatch, resolveAccentTokens } from "./theme/accents.js";
+export type { AccentTokens, ResolvedTheme, SemanticColorTokens } from "./theme/types.js";
 export {
   breakpoints,
   colors,

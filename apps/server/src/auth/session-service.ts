@@ -107,19 +107,23 @@ export function createSessionService(options: SessionServiceOptions): SessionSer
     const remaining = session.expiresAt - now;
     let activeSession = session;
     if (remaining <= options.sessionRenewalThresholdMs) {
-      const renewed = await options.repos.sessions.renew(
-        session.id,
-        now + options.sessionTtlMs,
-        now,
+      // Rotate the token value (not just its expiry) so a long-lived session's cookie value
+      // changes periodically, shrinking the replay window for a previously leaked token.
+      const newToken = generateOpaqueToken();
+      const rotated = await options.repos.sessions.create({
+        userId: session.userId,
+        tokenHash: hashToken(newToken),
+        expiresAt: now + options.sessionTtlMs,
+        createdAt: session.createdAt,
+        lastSeenAt: now,
+      });
+      await options.repos.sessions.deleteById(session.id);
+      activeSession = rotated;
+      reply.setCookie(
+        SESSION_COOKIE_NAME,
+        newToken,
+        sessionCookieOptions({ ...cookieSecurity, maxAgeMs: options.sessionTtlMs }),
       );
-      if (renewed) {
-        activeSession = renewed;
-        reply.setCookie(
-          SESSION_COOKIE_NAME,
-          rawToken,
-          sessionCookieOptions({ ...cookieSecurity, maxAgeMs: options.sessionTtlMs }),
-        );
-      }
     } else {
       const touched = await options.repos.sessions.touch(session.id, now);
       if (touched) {

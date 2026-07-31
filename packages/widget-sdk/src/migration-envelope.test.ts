@@ -10,7 +10,7 @@ import {
 describe("widgetDataResponseSchema", () => {
   it("accepts a success envelope", () => {
     const response = createWidgetDataResponse({
-      widgetId: "demo-metrics",
+      widgetId: "clock",
       instanceId: "inst-1",
       state: "success",
       data: { value: 12 },

@@ -1,4 +1,5 @@
 import type { DashoraDatabase } from "../client.js";
+import { createAuditEventsRepository } from "./audit-events.js";
 import { createCacheEntriesRepository } from "./cache-entries.js";
 import { createDashboardsRepository } from "./dashboards.js";
 import { createIntegrationsRepository } from "./integrations.js";
@@ -27,6 +28,7 @@ export type Repositories = {
   settings: ReturnType<typeof createSettingsRepository>;
   setupTokens: ReturnType<typeof createSetupTokensRepository>;
   todoItems: ReturnType<typeof createTodoItemsRepository>;
+  auditEvents: ReturnType<typeof createAuditEventsRepository>;
 };
 
 /** Build the persistence layer used by HTTP routes — never run SQL in route handlers. */
@@ -45,10 +47,12 @@ export function createRepositories(db: DashoraDatabase): Repositories {
     settings: createSettingsRepository(db),
     setupTokens: createSetupTokensRepository(db),
     todoItems: createTodoItemsRepository(db),
+    auditEvents: createAuditEventsRepository(db),
   };
 }
 
 export {
+  createAuditEventsRepository,
   createCacheEntriesRepository,
   createDashboardsRepository,
   createIntegrationsRepository,

@@ -26,6 +26,7 @@ function createDefaultDashboard(): Dashboard {
     id: dashboardId,
     name: DEFAULT_DASHBOARD_NAME,
     slug: DEFAULT_DASHBOARD_SLUG,
+    themeOverride: null,
     createdAt,
     updatedAt: createdAt,
     pages: DEFAULT_DASHBOARD_PAGES.map((page, index) => ({

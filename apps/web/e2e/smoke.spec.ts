@@ -134,6 +134,7 @@ async function mockAuthenticatedSession(page: Page, options?: { withLayout?: boo
           id: DASHBOARD_ID,
           name: "Dashboard",
           slug: "default",
+          themeOverride: null,
           pages,
           createdAt: now,
           updatedAt: now,
@@ -188,30 +189,29 @@ test("shows a signed-out state when the API is unreachable", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
-test("floating navigation stays sticky while account row scrolls away", async ({ page }) => {
+test("floating navigation stays sticky while scrolling", async ({ page }) => {
   await mockAuthenticatedSession(page, { withLayout: true });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
 
-  const session = page.locator(".app-header__session");
   const sticky = page.locator("header.app-header__nav-sticky");
   const navPill = page.locator(".top-nav__inner");
 
-  await expect(session).toBeVisible();
+  await expect(page.locator(".app-header__session")).toHaveCount(0);
+  await expect(page.getByText(/Signed in as/i)).toHaveCount(0);
   await expect(page.getByRole("navigation", { name: "Dashboard pages" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
   await expect(page.getByLabel(/Weather widget/i)).toBeVisible();
 
   const atTop = await page.evaluate(() => {
-    const sessionEl = document.querySelector(".app-header__session");
     const stickyEl = document.querySelector("header.app-header__nav-sticky");
     const pillEl = document.querySelector(".top-nav__inner");
-    if (!sessionEl || !stickyEl || !pillEl) {
+    if (!stickyEl || !pillEl) {
       return { ok: false as const };
     }
     return {
       ok: true as const,
       stickyPosition: getComputedStyle(stickyEl).position,
-      sessionTop: sessionEl.getBoundingClientRect().top,
       pillTop: pillEl.getBoundingClientRect().top,
     };
   });
@@ -220,8 +220,7 @@ test("floating navigation stays sticky while account row scrolls away", async ({
     return;
   }
   expect(atTop.stickyPosition).toBe("sticky");
-  expect(atTop.sessionTop).toBeGreaterThanOrEqual(0);
-  expect(atTop.pillTop).toBeGreaterThan(atTop.sessionTop);
+  expect(atTop.pillTop).toBeGreaterThanOrEqual(0);
 
   await expect(page).toHaveScreenshot("floating-nav-top-desktop.png", {
     animations: "disabled",
@@ -233,14 +232,12 @@ test("floating navigation stays sticky while account row scrolls away", async ({
   await page.waitForTimeout(150);
 
   const scrolled = await page.evaluate(() => {
-    const sessionEl = document.querySelector(".app-header__session");
     const stickyEl = document.querySelector("header.app-header__nav-sticky");
     const pillEl = document.querySelector(".top-nav__inner");
-    if (!sessionEl || !stickyEl || !pillEl) {
+    if (!stickyEl || !pillEl) {
       return { ok: false as const };
     }
 
-    const sessionRect = sessionEl.getBoundingClientRect();
     const pillRect = pillEl.getBoundingClientRect();
     const stickyStyle = getComputedStyle(stickyEl);
 
@@ -253,7 +250,6 @@ test("floating navigation stays sticky while account row scrolls away", async ({
       ok: true as const,
       stickyPosition: stickyStyle.position,
       stickyZ: stickyStyle.zIndex,
-      sessionBottom: sessionRect.bottom,
       pillTop: pillRect.top,
       pillInsideSticky: stickyEl.contains(pillEl),
       probeInsidePill: pillProbe ? stickyEl.contains(pillProbe) : false,
@@ -266,7 +262,6 @@ test("floating navigation stays sticky while account row scrolls away", async ({
   }
   expect(scrolled.stickyPosition).toBe("sticky");
   expect(Number(scrolled.stickyZ)).toBeGreaterThanOrEqual(100);
-  expect(scrolled.sessionBottom).toBeLessThanOrEqual(0);
   expect(scrolled.pillTop).toBeGreaterThanOrEqual(8);
   expect(scrolled.pillTop).toBeLessThanOrEqual(24);
   expect(scrolled.pillInsideSticky).toBe(true);
@@ -276,7 +271,6 @@ test("floating navigation stays sticky while account row scrolls away", async ({
     animations: "disabled",
     maxDiffPixelRatio: 0.02,
   });
-  await expect(session).not.toBeInViewport();
   await expect(sticky).toBeInViewport();
 });
 
@@ -288,7 +282,8 @@ test("floating navigation works on mobile light theme", async ({ page }) => {
     document.documentElement.setAttribute("data-theme", "light");
   });
 
-  await expect(page.getByText("Signed in as Thom")).toBeVisible();
+  await expect(page.getByText(/Signed in as/i)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
   await expect(page).toHaveScreenshot("floating-nav-top-mobile.png", {
     animations: "disabled",
     maxDiffPixelRatio: 0.03,
@@ -299,10 +294,9 @@ test("floating navigation works on mobile light theme", async ({ page }) => {
   await page.waitForTimeout(150);
 
   const layering = await page.evaluate(() => {
-    const sessionEl = document.querySelector(".app-header__session");
     const stickyEl = document.querySelector("header.app-header__nav-sticky");
     const pillEl = document.querySelector(".top-nav__inner");
-    if (!sessionEl || !stickyEl || !pillEl) {
+    if (!stickyEl || !pillEl) {
       return { ok: false as const };
     }
     const pillRect = pillEl.getBoundingClientRect();
@@ -313,7 +307,6 @@ test("floating navigation works on mobile light theme", async ({ page }) => {
     return {
       ok: true as const,
       sticky: getComputedStyle(stickyEl).position === "sticky",
-      sessionBottom: sessionEl.getBoundingClientRect().bottom,
       pillTop: pillRect.top,
       radius: getComputedStyle(pillEl).borderRadius,
       probeInsideNav: probe ? stickyEl.contains(probe) : false,
@@ -325,7 +318,6 @@ test("floating navigation works on mobile light theme", async ({ page }) => {
     return;
   }
   expect(layering.sticky).toBe(true);
-  expect(layering.sessionBottom).toBeLessThanOrEqual(0);
   expect(layering.pillTop).toBeGreaterThanOrEqual(4);
   expect(layering.pillTop).toBeLessThanOrEqual(24);
   expect(layering.radius).not.toBe("0px");

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isCommonPassword, passwordContainsEmailLocalPart } from "./password-denylist.js";
 
 export const authUserSchema = z.object({
   id: z.string().uuid(),
@@ -36,12 +37,29 @@ const passwordSchema = z
   .min(12, "Password must be at least 12 characters")
   .max(128, "Password must be at most 128 characters");
 
-export const setupRequestSchema = z.object({
-  token: z.string().min(1).max(256),
-  email: z.string().email().max(254),
-  displayName: z.string().trim().min(1).max(120),
-  password: passwordSchema,
-});
+export const setupRequestSchema = z
+  .object({
+    token: z.string().min(1).max(256),
+    email: z.string().email().max(254),
+    displayName: z.string().trim().min(1).max(120),
+    password: passwordSchema,
+  })
+  .superRefine((value, ctx) => {
+    if (isCommonPassword(value.password)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Choose a less common password",
+        path: ["password"],
+      });
+    }
+    if (passwordContainsEmailLocalPart(value.password, value.email)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Password must not include your email address",
+        path: ["password"],
+      });
+    }
+  });
 
 export type SetupRequest = z.infer<typeof setupRequestSchema>;
 

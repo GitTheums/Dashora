@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  DemoMetricsRenderer,
-  DemoMetricsSettings,
-  demoMetricsDefinition,
-  demoMetricsProvider,
-} from "../examples/demo-metrics/index.js";
+import { z } from "zod";
+import { defineWidget } from "../definition.js";
+import { defineWidgetProvider } from "../provider.js";
 import {
   createWidgetClientRegistry,
   createWidgetMetadataRegistry,
@@ -13,56 +10,106 @@ import {
   toServerRegistration,
 } from "./index.js";
 
+const fixtureConfigSchema = z.object({
+  title: z.string().trim().min(1).max(40).default("Fixture"),
+  warningThreshold: z.number().int().min(0).max(10_000).default(80),
+  enabled: z.boolean().default(true),
+});
+
+type FixtureConfig = z.infer<typeof fixtureConfigSchema>;
+
+const fixtureDefinition = defineWidget({
+  id: "registry-fixture",
+  name: "Registry Fixture",
+  version: "0.1.0",
+  schemaVersion: 2,
+  description: "Inline fixture used only by registry unit tests.",
+  category: "utilities",
+  icon: { name: "chart", label: "Fixture" },
+  configSchema: fixtureConfigSchema,
+  defaultConfig: fixtureConfigSchema.parse({}),
+  capabilities: {
+    supportsManualRefresh: true,
+    supportsTitleOverride: true,
+    requiresIntegration: false,
+    supportsDisable: true,
+    hasSettings: true,
+  },
+  migrateConfig: {
+    currentVersion: 2,
+    steps: [
+      {
+        fromVersion: 1,
+        toVersion: 2,
+        migrate: (config: unknown) => {
+          const legacy = config as { title?: string; threshold?: number; enabled?: boolean };
+          return {
+            title: legacy.title ?? "Fixture",
+            warningThreshold: legacy.threshold ?? 80,
+            enabled: legacy.enabled ?? true,
+          };
+        },
+      },
+    ],
+  },
+});
+
+const fixtureProvider = defineWidgetProvider<FixtureConfig, { ok: true }>({
+  id: "registry-fixture",
+  fetch: async () => ({ state: "success", data: { ok: true } }),
+});
+
+function FixtureRenderer() {
+  return null;
+}
+
+function FixtureSettings() {
+  return null;
+}
+
 describe("widget registries", () => {
   it("indexes metadata by id and category", () => {
-    const registry = createWidgetMetadataRegistry([demoMetricsDefinition]);
-    expect(registry.has("demo-metrics")).toBe(true);
-    expect(registry.require("demo-metrics").name).toBe("Demo Metrics");
-    expect(registry.getByCategory("demo")).toHaveLength(1);
-    expect(registry.ids()).toEqual(["demo-metrics"]);
+    const registry = createWidgetMetadataRegistry([fixtureDefinition]);
+    expect(registry.has("registry-fixture")).toBe(true);
+    expect(registry.require("registry-fixture").name).toBe("Registry Fixture");
+    expect(registry.getByCategory("utilities")).toHaveLength(1);
+    expect(registry.ids()).toEqual(["registry-fixture"]);
   });
 
   it("rejects duplicate metadata ids", () => {
-    expect(() =>
-      createWidgetMetadataRegistry([demoMetricsDefinition, demoMetricsDefinition]),
-    ).toThrow(/Duplicate widget id/);
+    expect(() => createWidgetMetadataRegistry([fixtureDefinition, fixtureDefinition])).toThrow(
+      /Duplicate widget id/,
+    );
   });
 
   it("parses and migrates config on the server registry", () => {
     const registry = createWidgetServerRegistry([
-      toServerRegistration(demoMetricsDefinition, demoMetricsProvider),
+      toServerRegistration(fixtureDefinition, fixtureProvider),
     ]);
 
-    const migrated = registry.parseConfig(
-      "demo-metrics",
-      { metricLabel: "Jobs", threshold: 50, seedValue: 3 },
-      1,
-    );
+    const migrated = registry.parseConfig("registry-fixture", { title: "Jobs", threshold: 50 }, 1);
 
     expect(migrated).toMatchObject({
-      metricLabel: "Jobs",
+      title: "Jobs",
       warningThreshold: 50,
       enabled: true,
-      seedValue: 3,
     });
 
-    expect(registry.requireProvider("demo-metrics").id).toBe("demo-metrics");
+    expect(registry.requireProvider("registry-fixture").id).toBe("registry-fixture");
   });
 
   it("registers renderer and settings on the client registry", () => {
     const registry = createWidgetClientRegistry([
-      toClientRegistration(demoMetricsDefinition, DemoMetricsRenderer, DemoMetricsSettings),
+      toClientRegistration(fixtureDefinition, FixtureRenderer, FixtureSettings),
     ]);
 
-    expect(registry.requireRenderer("demo-metrics")).toBe(DemoMetricsRenderer);
-    expect(registry.getSettings("demo-metrics")).toBe(DemoMetricsSettings);
+    expect(registry.requireRenderer("registry-fixture")).toBe(FixtureRenderer);
+    expect(registry.getSettings("registry-fixture")).toBe(FixtureSettings);
   });
 
   it("requires Settings when hasSettings is true", () => {
     expect(() =>
-      createWidgetClientRegistry([
-        toClientRegistration(demoMetricsDefinition, DemoMetricsRenderer),
-      ]),
+      createWidgetClientRegistry([toClientRegistration(fixtureDefinition, FixtureRenderer)]),
     ).toThrow(/hasSettings/);
   });
 });

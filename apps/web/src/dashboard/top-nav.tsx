@@ -10,9 +10,11 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
+  Tooltip,
   cx,
   useTheme,
 } from "@dashora/ui";
+import { Settings } from "lucide-react";
 import {
   type CSSProperties,
   useCallback,
@@ -22,15 +24,10 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  DashoraMark,
-  EditIcon,
-  MenuIcon,
-  MoonIcon,
-  MoreIcon,
-  SearchIcon,
-  SunIcon,
-} from "./icons.js";
+import { navigate } from "../auth/routing.js";
+import { settingsAppearanceHref } from "../settings/paths.js";
+import { BrandMark, useBrandName } from "../theme/brand-mark.js";
+import { EditIcon, MenuIcon, MoonIcon, MoreIcon, SearchIcon, SunIcon } from "./icons.js";
 import { PageIconGlyph } from "./page-icons.js";
 
 export type TopNavProps = {
@@ -45,6 +42,9 @@ export type TopNavProps = {
   onDeletePage: (page: Page) => void;
   onMovePage: (page: Page, direction: -1 | 1) => void;
   canDeletePages: boolean;
+  /** Current location used as returnTo when opening Settings. */
+  returnToPath?: string;
+  settingsActive?: boolean;
 };
 
 export function TopNav({
@@ -59,10 +59,18 @@ export function TopNav({
   onDeletePage,
   onMovePage,
   canDeletePages,
+  returnToPath,
+  settingsActive = false,
 }: TopNavProps) {
   const { resolved, toggle } = useTheme();
+  const brandName = useBrandName();
   const [commandOpen, setCommandOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const openSettings = useCallback(() => {
+    navigate(settingsAppearanceHref(returnToPath ?? window.location.pathname));
+    setMobileNavOpen(false);
+  }, [returnToPath]);
   const [visibleCount, setVisibleCount] = useState(pages.length);
   const navRef = useRef<HTMLElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -173,6 +181,14 @@ export function TopNav({
         },
       },
       {
+        id: "appearance-settings",
+        label: "Settings",
+        group: "Appearance",
+        onSelect: () => {
+          openSettings();
+        },
+      },
+      {
         id: "edit-dashboard",
         label: editMode ? "Exit edit mode" : "Edit dashboard",
         group: "Dashboard",
@@ -185,7 +201,7 @@ export function TopNav({
         label: "Open design system",
         group: "Developer",
         onSelect: () => {
-          window.location.href = "/design-system";
+          navigate("/design-system");
         },
       },
       {
@@ -193,11 +209,11 @@ export function TopNav({
         label: "Provider diagnostics",
         group: "Administration",
         onSelect: () => {
-          window.location.href = "/admin/providers";
+          navigate("/admin/providers");
         },
       },
     ],
-    [editMode, onCreatePage, onEditModeChange, onPageChange, pages, resolved, toggle],
+    [editMode, onCreatePage, onEditModeChange, onPageChange, openSettings, pages, resolved, toggle],
   );
 
   function renderPageButton(page: Page, options?: { inOverflow?: boolean }) {
@@ -297,9 +313,8 @@ export function TopNav({
             >
               <MenuIcon />
             </IconButton>
-            <a className="top-nav__logo" href="/" aria-label="Dashora home">
-              <DashoraMark />
-              <span className="top-nav__wordmark">Dashora</span>
+            <a className="top-nav__logo" href="/" aria-label={`${brandName} home`}>
+              <BrandMark showName nameClassName="top-nav__wordmark" />
             </a>
           </div>
 
@@ -371,12 +386,24 @@ export function TopNav({
               <span className="top-nav__command-label">Search</span>
               <kbd className="top-nav__kbd">{isMac ? "⌘K" : "Ctrl K"}</kbd>
             </Button>
-            <IconButton
-              label={resolved === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-              onClick={toggle}
-            >
-              {resolved === "dark" ? <SunIcon /> : <MoonIcon />}
-            </IconButton>
+            <Tooltip content="Light / dark mode">
+              <IconButton
+                label={resolved === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                onClick={toggle}
+              >
+                {resolved === "dark" ? <SunIcon /> : <MoonIcon />}
+              </IconButton>
+            </Tooltip>
+            <Tooltip content="Settings">
+              <IconButton
+                label="Settings"
+                className={cx("top-nav__settings", settingsActive && "is-active")}
+                aria-current={settingsActive ? "page" : undefined}
+                onClick={openSettings}
+              >
+                <Settings size={18} strokeWidth={2} aria-hidden="true" />
+              </IconButton>
+            </Tooltip>
             <Button
               variant={editMode ? "primary" : "ghost"}
               size="sm"

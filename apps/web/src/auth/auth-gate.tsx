@@ -1,14 +1,32 @@
-import type { AuthUser } from "@dashora/shared";
-import { Button, EmptyState, Skeleton, Stack } from "@dashora/ui";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { AuthUser, DashboardThemeOverride } from "@dashora/shared";
+import { Button, EmptyState, Skeleton, Stack, useTheme } from "@dashora/ui";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ProviderDiagnosticsPage } from "../admin/provider-diagnostics-page.js";
 import { App } from "../app.js";
 import { type DashboardApi, createDashboardApi } from "../dashboard/api.js";
 import { DesignSystemPage } from "../design-system-page.js";
+import { AccountPage } from "../settings/account-page.js";
+import { type BackupApi, createBackupApi } from "../settings/backup-api.js";
+import { BackupPage } from "../settings/backup-page.js";
+import {
+  SETTINGS_APPEARANCE_PATH,
+  consumePathAfterLogin,
+  isAccountSettingsPath,
+  isAppearanceSettingsPath,
+  isBackupSettingsPath,
+  isSettingsPath,
+  settingsAppearanceHref,
+  stashPathAfterLogin,
+} from "../settings/paths.js";
+import { readReturnToFromSearch } from "../settings/return-to.js";
+import { SettingsShell } from "../settings/settings-shell.js";
+import { createThemeApi } from "../theme/api.js";
+import { type AppearanceLeaveController, AppearancePage } from "../theme/appearance-page.js";
+import { useThemeBootstrap } from "../theme/use-theme-bootstrap.js";
 import { type AuthApi, AuthApiError, createAuthApi } from "./api.js";
 import { AuthShell } from "./auth-shell.js";
 import { LoginPage } from "./login-page.js";
-import { getPath, navigate, readSetupTokenFromLocation } from "./routing.js";
+import { getPath, getPathWithSearch, navigate, readSetupTokenFromLocation } from "./routing.js";
 import { SetupPage } from "./setup-page.js";
 
 export type AuthGateProps = {
@@ -80,10 +98,14 @@ export function AuthGate({
       navigate("/login");
     }
     if (phase.kind === "signed-out" && path !== "/login" && path !== "/setup") {
+      if (isSettingsPath(path)) {
+        stashPathAfterLogin(getPathWithSearch());
+      }
       navigate("/login");
     }
     if (phase.kind === "authenticated" && (path === "/login" || path === "/setup")) {
-      navigate("/");
+      const restored = consumePathAfterLogin();
+      navigate(restored && restored.length > 0 ? restored : "/");
     }
   }, [phase, path]);
 
@@ -139,21 +161,13 @@ export function AuthGate({
     );
   }
 
-  // Authenticated
-  if (path === "/design-system") {
-    return <DesignSystemPage />;
-  }
-
-  if (path === "/admin/providers") {
-    return <ProviderDiagnosticsPage apiBaseUrl={apiBaseUrl} />;
-  }
-
   return (
     <AuthenticatedApp
       appName={appName}
       user={phase.user}
       api={api}
       apiBaseUrl={apiBaseUrl}
+      path={path}
       {...(dashboardApiOverride ? { dashboardApi: dashboardApiOverride } : {})}
       onSignedOut={() => {
         setPhase({ kind: "signed-out", notice: "You have been signed out." });
@@ -168,6 +182,7 @@ type AuthenticatedAppProps = {
   user: AuthUser;
   api: AuthApi;
   apiBaseUrl: string;
+  path: string;
   dashboardApi?: DashboardApi;
   onSignedOut: () => void;
 };
@@ -177,6 +192,7 @@ function AuthenticatedApp({
   user,
   api,
   apiBaseUrl,
+  path,
   dashboardApi: dashboardApiOverride,
   onSignedOut,
 }: AuthenticatedAppProps) {
@@ -184,23 +200,127 @@ function AuthenticatedApp({
     () => dashboardApiOverride ?? createDashboardApi(apiBaseUrl),
     [apiBaseUrl, dashboardApiOverride],
   );
+  const themeApi = useMemo(() => createThemeApi(apiBaseUrl), [apiBaseUrl]);
+  const backupApi: BackupApi = useMemo(() => createBackupApi(apiBaseUrl), [apiBaseUrl]);
+  const { ready: themeReady } = useThemeBootstrap(themeApi);
+  const { setDashboardOverride } = useTheme();
+  const [dashboardThemeOverride, setDashboardThemeOverride] =
+    useState<DashboardThemeOverride | null>(null);
+  const appearanceLeaveRef = useRef<AppearanceLeaveController | null>(null);
 
-  return (
-    <App
-      appName={appName}
-      dashboardApi={dashboardApi}
-      session={{
-        displayName: user.displayName,
-        onSignOut: () => {
-          void (async () => {
-            try {
-              await api.logout();
-            } finally {
-              onSignedOut();
-            }
-          })();
-        },
-      }}
-    />
-  );
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const dashboard = await dashboardApi.getDashboard();
+        if (!cancelled) {
+          setDashboardThemeOverride(dashboard.themeOverride);
+          setDashboardOverride(dashboard.themeOverride);
+        }
+      } catch {
+        // Dashboard load failures are handled by the dashboard page itself.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dashboardApi, setDashboardOverride]);
+
+  const signOut = useCallback(() => {
+    void (async () => {
+      try {
+        await api.logout();
+      } finally {
+        onSignedOut();
+      }
+    })();
+  }, [api, onSignedOut]);
+
+  useEffect(() => {
+    if (path === "/settings") {
+      const returnTo = readReturnToFromSearch();
+      navigate(settingsAppearanceHref(returnTo === "/" ? null : returnTo));
+    } else if (
+      isSettingsPath(path) &&
+      !isAppearanceSettingsPath(path) &&
+      !isAccountSettingsPath(path) &&
+      !isBackupSettingsPath(path)
+    ) {
+      navigate(SETTINGS_APPEARANCE_PATH);
+    }
+  }, [path]);
+
+  if (!themeReady) {
+    return (
+      <AuthShell title="Loading appearance" lede="Applying your saved theme preferences…">
+        <Stack gap="md">
+          <Skeleton height="2.75rem" />
+          <Skeleton height="2.75rem" />
+        </Stack>
+      </AuthShell>
+    );
+  }
+
+  if (path === "/design-system") {
+    return <DesignSystemPage />;
+  }
+
+  if (path === "/admin/providers") {
+    return <ProviderDiagnosticsPage apiBaseUrl={apiBaseUrl} />;
+  }
+
+  if (
+    isAppearanceSettingsPath(path) ||
+    isAccountSettingsPath(path) ||
+    isBackupSettingsPath(path) ||
+    path === "/settings"
+  ) {
+    const returnTo = readReturnToFromSearch();
+    const requestLeave = (destination: string) => {
+      if (appearanceLeaveRef.current) {
+        appearanceLeaveRef.current.requestLeave(destination);
+        return;
+      }
+      navigate(destination);
+    };
+    const activeSection = isAccountSettingsPath(path)
+      ? "account"
+      : isBackupSettingsPath(path)
+        ? "backup"
+        : "appearance";
+    return (
+      <SettingsShell
+        activeSection={activeSection}
+        returnTo={returnTo}
+        onBack={() => {
+          requestLeave(returnTo);
+        }}
+        onNavigateHome={() => {
+          requestLeave(returnTo);
+        }}
+      >
+        {activeSection === "account" ? (
+          <AccountPage user={user} onSignOut={signOut} />
+        ) : activeSection === "backup" ? (
+          <BackupPage api={backupApi} />
+        ) : (
+          <AppearancePage
+            api={themeApi}
+            dashboardOverride={dashboardThemeOverride}
+            onDashboardOverrideChange={(override) => {
+              setDashboardThemeOverride(override);
+              setDashboardOverride(override);
+            }}
+            envAppName={appName}
+            leaveControllerRef={appearanceLeaveRef}
+            onRequestLeave={(destination) => {
+              navigate(destination);
+            }}
+          />
+        )}
+      </SettingsShell>
+    );
+  }
+
+  return <App appName={appName} dashboardApi={dashboardApi} />;
 }

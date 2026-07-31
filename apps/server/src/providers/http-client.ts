@@ -1,5 +1,13 @@
 import { ProviderError, toProviderError } from "./errors.js";
+import { createPinnedDispatcher } from "./pinned-dispatcher.js";
 import { redactHeaders } from "./redact.js";
+
+/**
+ * Minimal shape `validateUrl` may resolve to. Deliberately narrower than
+ * `SsrfValidationResult` (which also carries the parsed `URL`) so callers/tests can return just
+ * the address list without needing to reconstruct a `URL` object.
+ */
+export type UrlValidationResult = { addresses?: string[] };
 
 export type ProviderHttpClientOptions = {
   userAgent: string;
@@ -24,6 +32,16 @@ export type ProviderHttpRequest = {
   lastModified?: string;
   /** Override default redirects. */
   maxRedirects?: number;
+  /**
+   * Optional SSRF / allow-list guard. Invoked for the initial URL and every redirect target.
+   * Throw ProviderError to abort the request. May return the validated IP address(es) for the
+   * URL's hostname (e.g. from `createSsrfUrlValidator`) — when present, the actual TCP
+   * connection is pinned to those addresses to prevent DNS-rebinding between validation and
+   * connect time.
+   */
+  validateUrl?: (
+    url: string,
+  ) => undefined | UrlValidationResult | Promise<undefined | UrlValidationResult>;
 };
 
 export type ProviderHttpResponse = {
@@ -90,6 +108,16 @@ async function readBodyLimited(
     return "";
   }
 
+  // Fail fast on an oversized declared Content-Length before streaming any of the body —
+  // the streaming cap below still protects against a lying/absent header.
+  const declaredLength = pickHeader(response.headers, "content-length");
+  if (declaredLength !== undefined) {
+    const parsedLength = Number(declaredLength);
+    if (Number.isFinite(parsedLength) && parsedLength > maxBytes) {
+      throw new ProviderError("too_large");
+    }
+  }
+
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -142,6 +170,9 @@ function mapAbortToProviderError(error: unknown, phase: "connect" | "request"): 
   return toProviderError(error);
 }
 
+/** Fastify/Node's global `fetch` accepts a non-standard `dispatcher` option (undici). */
+type FetchInitWithDispatcher = RequestInit & { dispatcher?: import("undici").Agent };
+
 export function createProviderHttpClient(options: ProviderHttpClientOptions) {
   const fetchImpl = options.fetchImpl ?? fetch;
 
@@ -153,11 +184,21 @@ export function createProviderHttpClient(options: ProviderHttpClientOptions) {
       throw new ProviderError("invalid_url", { cause: error });
     }
 
+    let pinnedAddresses: string[] | undefined;
+    if (input.validateUrl) {
+      const result = await input.validateUrl(currentUrl);
+      pinnedAddresses = result?.addresses;
+    }
+
     const method = (input.method ?? "GET").toUpperCase();
     const maxRedirects = input.maxRedirects ?? options.maxRedirects;
     let redirected = false;
 
     for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
+      const dispatcher =
+        pinnedAddresses && pinnedAddresses.length > 0
+          ? createPinnedDispatcher(new URL(currentUrl).hostname, pinnedAddresses)
+          : undefined;
       const mutable: MutableAbort = {
         controller: new AbortController(),
         timers: [],
@@ -202,88 +243,103 @@ export function createProviderHttpClient(options: ProviderHttpClientOptions) {
         headers.set("if-modified-since", input.lastModified);
       }
 
-      let response: Response;
       try {
-        response = await fetchImpl(currentUrl, {
-          method,
-          headers,
-          ...(method === "GET" || method === "HEAD" || input.body === undefined
-            ? {}
-            : { body: input.body }),
-          redirect: "manual",
-          signal,
-        });
-        clearTimeout(connectTimer);
-      } catch (error) {
-        for (const timer of mutable.timers) {
-          clearTimeout(timer);
-        }
-        if (options.signal?.aborted) {
-          throw new ProviderError("cancelled", { cause: error });
-        }
-        if (input.signal?.aborted) {
-          throw new ProviderError("aborted", { cause: error });
-        }
-        throw mapAbortToProviderError(error, "connect");
-      }
-
-      const status = response.status;
-      const isRedirect =
-        status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
-      if (isRedirect) {
-        const location = response.headers.get("location");
-        // Drain body to free connection.
+        let response: Response;
         try {
-          await response.arrayBuffer();
-        } catch {
-          // ignore
+          response = await fetchImpl(currentUrl, {
+            method,
+            headers,
+            ...(method === "GET" || method === "HEAD" || input.body === undefined
+              ? {}
+              : { body: input.body }),
+            redirect: "manual",
+            signal,
+            ...(dispatcher ? { dispatcher } : {}),
+          } as FetchInitWithDispatcher);
+          clearTimeout(connectTimer);
+        } catch (error) {
+          for (const timer of mutable.timers) {
+            clearTimeout(timer);
+          }
+          if (options.signal?.aborted) {
+            throw new ProviderError("cancelled", { cause: error });
+          }
+          if (input.signal?.aborted) {
+            throw new ProviderError("aborted", { cause: error });
+          }
+          throw mapAbortToProviderError(error, "connect");
         }
-        for (const timer of mutable.timers) {
-          clearTimeout(timer);
-        }
-        if (!location) {
-          throw new ProviderError("http_error", { statusCode: status });
-        }
-        if (redirectCount >= maxRedirects) {
-          throw new ProviderError("too_many_redirects");
-        }
-        currentUrl = new URL(location, currentUrl).toString();
-        redirected = true;
-        continue;
-      }
 
-      let bodyText: string;
-      try {
-        bodyText = await readBodyLimited(response, options.maxResponseBytes, signal);
-      } catch (error) {
-        for (const timer of mutable.timers) {
-          clearTimeout(timer);
+        const status = response.status;
+        const isRedirect =
+          status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+        if (isRedirect) {
+          const location = response.headers.get("location");
+          // Drain body to free connection.
+          try {
+            await response.arrayBuffer();
+          } catch {
+            // ignore
+          }
+          for (const timer of mutable.timers) {
+            clearTimeout(timer);
+          }
+          if (!location) {
+            throw new ProviderError("http_error", { statusCode: status });
+          }
+          if (redirectCount >= maxRedirects) {
+            throw new ProviderError("too_many_redirects");
+          }
+          currentUrl = new URL(location, currentUrl).toString();
+          if (input.validateUrl) {
+            const result = await input.validateUrl(currentUrl);
+            pinnedAddresses = result?.addresses;
+          } else {
+            pinnedAddresses = undefined;
+          }
+          redirected = true;
+          continue;
         }
-        if (options.signal?.aborted) {
-          throw new ProviderError("cancelled", { cause: error });
+
+        let bodyText: string;
+        try {
+          bodyText = await readBodyLimited(response, options.maxResponseBytes, signal);
+        } catch (error) {
+          for (const timer of mutable.timers) {
+            clearTimeout(timer);
+          }
+          if (options.signal?.aborted) {
+            throw new ProviderError("cancelled", { cause: error });
+          }
+          throw mapAbortToProviderError(error, "request");
+        } finally {
+          for (const timer of mutable.timers) {
+            clearTimeout(timer);
+          }
         }
-        throw mapAbortToProviderError(error, "request");
+
+        const etag = pickHeader(response.headers, "etag");
+        const lastModified = pickHeader(response.headers, "last-modified");
+        const headersObject = redactHeaders(headerRecord(response.headers));
+
+        return {
+          url: currentUrl,
+          status,
+          ok: status >= 200 && status < 300,
+          headers: headersObject,
+          bodyText,
+          redirected,
+          notModified: status === 304,
+          ...(etag ? { etag } : {}),
+          ...(lastModified ? { lastModified } : {}),
+        };
       } finally {
-        for (const timer of mutable.timers) {
-          clearTimeout(timer);
+        if (dispatcher) {
+          dispatcher.close().catch(() => {
+            // Best-effort cleanup of pinned-dispatcher sockets; never fails the request.
+          });
         }
       }
-
-      const etag = pickHeader(response.headers, "etag");
-      const lastModified = pickHeader(response.headers, "last-modified");
-      const headersObject = redactHeaders(headerRecord(response.headers));
-
-      return {
-        url: currentUrl,
-        status,
-        ok: status >= 200 && status < 300,
-        headers: headersObject,
-        bodyText,
-        redirected,
-        notModified: status === 304,
-        ...(etag ? { etag } : {}),
-        ...(lastModified ? { lastModified } : {}),
-      };
     }
 
     throw new ProviderError("too_many_redirects");

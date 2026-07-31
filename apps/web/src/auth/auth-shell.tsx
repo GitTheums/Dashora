@@ -1,6 +1,6 @@
 import { Button, Input, Stack, cx, useTheme } from "@dashora/ui";
 import type { FormEvent, ReactNode } from "react";
-import { DashoraMark } from "../dashboard/icons.js";
+import { BrandMark } from "../theme/brand-mark.js";
 
 export type AuthShellProps = {
   title: string;
@@ -17,8 +17,7 @@ export function AuthShell({ title, lede, children, footer }: AuthShellProps) {
       <div className="auth-shell__ambient" aria-hidden="true" />
       <header className="auth-shell__top">
         <div className="auth-shell__brand">
-          <DashoraMark className="auth-shell__mark" />
-          <span className="auth-shell__product">Dashora</span>
+          <BrandMark className="auth-shell__mark" showName nameClassName="auth-shell__product" />
         </div>
         <Button
           type="button"

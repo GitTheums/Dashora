@@ -1,5 +1,10 @@
 import { createWidgetDataResponse, widgetDataResponseSchema } from "@dashora/widget-sdk";
 import {
+  createCustomApiProvider,
+  customApiConfigSchema,
+  customApiPreviewResponseSchema,
+} from "@dashora/widget-sdk/widgets/custom-api/server";
+import {
   todoItemResponseSchema,
   todoItemsResponseSchema,
 } from "@dashora/widget-sdk/widgets/todo/server";
@@ -9,8 +14,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { isStateChangingMethod, sendCsrfError, validateCsrf } from "../auth/csrf.js";
 import type { SessionService } from "../auth/session-service.js";
 import { sendApiError } from "../http/errors.js";
+import { createCustomApiAdapter } from "../providers/custom-api/api.js";
 import type { ProviderPlatform } from "../providers/platform.js";
+import { safeUrlLabel } from "../providers/redact.js";
 import { createOpenMeteoWeatherAdapter } from "../providers/weather/open-meteo.js";
+import type { ApiSecretService } from "../services/api-secret-service.js";
 import type { GithubIntegrationService } from "../services/github-integration-service.js";
 import type { IcsBasicAuthIntegrationService } from "../services/ics-basic-auth-service.js";
 import { type TodoService, TodoServiceError } from "../services/todo-service.js";
@@ -22,9 +30,12 @@ export type WidgetRouteOptions = {
   providers: ProviderPlatform;
   githubIntegrations?: GithubIntegrationService;
   icsBasicAuthIntegrations?: IcsBasicAuthIntegrationService;
+  apiSecrets?: ApiSecretService;
   resolveGithubToken?: () => string | null;
   resolveCryptoApiKey?: () => string | null;
   resolveEquitiesApiKey?: () => string | null;
+  resolveRedditCredentials?: () => { clientId: string; clientSecret: string } | null;
+  resolveTwitchCredentials?: () => { clientId: string; clientSecret: string } | null;
 };
 
 async function requireCsrf(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
@@ -68,11 +79,35 @@ export async function registerWidgetRoutes(
     providers,
     githubIntegrations,
     icsBasicAuthIntegrations,
+    apiSecrets,
     resolveGithubToken,
     resolveCryptoApiKey,
     resolveEquitiesApiKey,
+    resolveRedditCredentials,
+    resolveTwitchCredentials,
   } = options;
   const weatherAdapter = createOpenMeteoWeatherAdapter(providers);
+  const customApiAdapter = createCustomApiAdapter({ platform: providers });
+  const customApiPreviewProvider = createCustomApiProvider({ adapter: customApiAdapter });
+
+  async function resolveWidgetSecret(userId: string, credentialId: string): Promise<string | null> {
+    if (githubIntegrations) {
+      const token = await githubIntegrations.getToken(userId, credentialId);
+      if (token) {
+        return token;
+      }
+    }
+    if (icsBasicAuthIntegrations) {
+      const payload = await icsBasicAuthIntegrations.getSecretPayload(userId, credentialId);
+      if (payload) {
+        return payload;
+      }
+    }
+    if (apiSecrets) {
+      return apiSecrets.getSecret(userId, credentialId);
+    }
+    return null;
+  }
 
   const serverRegistry = createDashoraWidgetServerRegistry({
     todoService: todos,
@@ -81,6 +116,8 @@ export async function registerWidgetRoutes(
     ...(resolveGithubToken ? { resolveGithubToken } : {}),
     ...(resolveCryptoApiKey ? { resolveCryptoApiKey } : {}),
     ...(resolveEquitiesApiKey ? { resolveEquitiesApiKey } : {}),
+    ...(resolveRedditCredentials ? { resolveRedditCredentials } : {}),
+    ...(resolveTwitchCredentials ? { resolveTwitchCredentials } : {}),
   });
 
   app.get("/api/v1/widgets/weather/locations", async (request, reply) => {
@@ -111,6 +148,7 @@ export async function registerWidgetRoutes(
   });
 
   app.get("/api/v1/widgets/:widgetType/instances/:instanceId/data", async (request, reply) => {
+    const fetchStarted = performance.now();
     const auth = await sessions.resolveSession(request, reply);
     if (!auth) {
       return sendApiError(reply, 401, "unauthenticated", "Authentication required");
@@ -152,6 +190,8 @@ export async function registerWidgetRoutes(
       return sendApiError(reply, 400, "validation_error", "Invalid widget configuration");
     }
 
+    const durationMs = () => Math.round((performance.now() - fetchStarted) * 1000) / 1000;
+
     if (widgetType === "todo") {
       const items = await todos.list(auth.user.id, instanceId);
       const todoConfig = parsedConfig as {
@@ -160,7 +200,7 @@ export async function registerWidgetRoutes(
         enabled: boolean;
       };
       if (!todoConfig.enabled) {
-        return widgetDataResponseSchema.parse(
+        const response = widgetDataResponseSchema.parse(
           createWidgetDataResponse({
             widgetId: todoDefinition.id,
             instanceId,
@@ -169,18 +209,21 @@ export async function registerWidgetRoutes(
             meta: {
               fetchedAt: new Date().toISOString(),
               cache: "miss",
+              durationMs: durationMs(),
               schemaVersion: todoDefinition.schemaVersion,
               widgetVersion: todoDefinition.version,
             },
           }),
         );
+        reply.header("Server-Timing", `widget;dur=${response.meta.durationMs}`);
+        return response;
       }
       const data = {
         items,
         viewMode: todoConfig.viewMode,
         showCompleted: todoConfig.showCompleted,
       };
-      return widgetDataResponseSchema.parse(
+      const response = widgetDataResponseSchema.parse(
         createWidgetDataResponse({
           widgetId: todoDefinition.id,
           instanceId,
@@ -192,11 +235,14 @@ export async function registerWidgetRoutes(
           meta: {
             fetchedAt: new Date().toISOString(),
             cache: "miss",
+            durationMs: durationMs(),
             schemaVersion: todoDefinition.schemaVersion,
             widgetVersion: todoDefinition.version,
           },
         }),
       );
+      reply.header("Server-Timing", `widget;dur=${response.meta.durationMs}`);
+      return response;
     }
 
     const result = await provider.fetch({
@@ -209,21 +255,10 @@ export async function registerWidgetRoutes(
       typeof (parsedConfig as { credentialId?: unknown }).credentialId === "string"
         ? { credentialId: (parsedConfig as { credentialId: string }).credentialId }
         : {}),
-      getSecret: async (credentialId) => {
-        if (githubIntegrations) {
-          const token = await githubIntegrations.getToken(auth.user.id, credentialId);
-          if (token) {
-            return token;
-          }
-        }
-        if (icsBasicAuthIntegrations) {
-          return icsBasicAuthIntegrations.getSecretPayload(auth.user.id, credentialId);
-        }
-        return null;
-      },
+      getSecret: async (credentialId) => resolveWidgetSecret(auth.user.id, credentialId),
     });
 
-    return widgetDataResponseSchema.parse(
+    const response = widgetDataResponseSchema.parse(
       createWidgetDataResponse({
         widgetId: definition.id,
         instanceId,
@@ -234,11 +269,65 @@ export async function registerWidgetRoutes(
         meta: {
           fetchedAt: new Date().toISOString(),
           cache: result.cacheStatus ?? "miss",
+          durationMs: durationMs(),
           schemaVersion: definition.schemaVersion,
           widgetVersion: definition.version,
         },
       }),
     );
+    reply.header("Server-Timing", `widget;dur=${response.meta.durationMs};desc="${definition.id}"`);
+    return response;
+  });
+
+  app.post("/api/v1/widgets/custom-api/preview", async (request, reply) => {
+    if (!(await requireCsrf(request, reply))) {
+      return;
+    }
+    const auth = await sessions.resolveSession(request, reply);
+    if (!auth) {
+      return sendApiError(reply, 401, "unauthenticated", "Authentication required");
+    }
+
+    const parsed = customApiConfigSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return sendApiError(reply, 400, "validation_error", "Invalid Custom API configuration");
+    }
+
+    const config = parsed.data;
+    const headerNames = config.headers
+      .map((header) => header.name.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+
+    const result = await customApiPreviewProvider.fetch({
+      instanceId: "preview",
+      config,
+      forceRefresh: true,
+      getSecret: async (credentialId) => resolveWidgetSecret(auth.user.id, credentialId),
+    });
+
+    return customApiPreviewResponseSchema.parse({
+      ok: result.state === "success" || result.state === "empty" || result.state === "stale",
+      state:
+        result.state === "success" ||
+        result.state === "empty" ||
+        result.state === "error" ||
+        result.state === "configuration-required"
+          ? result.state
+          : result.state === "stale" || result.state === "refreshing"
+            ? "success"
+            : "error",
+      ...(result.message !== undefined ? { message: result.message } : {}),
+      ...(result.errorCode !== undefined ? { errorCode: result.errorCode } : {}),
+      ...(result.data !== undefined ? { data: result.data } : {}),
+      requestSummary: {
+        method: config.method,
+        urlLabel: config.url.trim() ? safeUrlLabel(config.url) : "(empty)",
+        headerNames,
+        allowPrivateNetwork: config.allowPrivateNetwork,
+        timeoutMs: config.timeoutMs,
+      },
+    });
   });
 
   app.get("/api/v1/widgets/todo/instances/:instanceId/items", async (request, reply) => {

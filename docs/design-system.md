@@ -14,18 +14,37 @@ Implementation lives primarily in `packages/ui` (tokens and primitives) and `app
 
 ## Theme tokens
 
-Tokens are CSS custom properties under a `:root` / dark media (or explicit theme class) scheme. Canonical categories:
+Tokens are CSS custom properties (`--ds-*`) applied by the theme engine. Canonical categories:
 
 | Token role | Purpose |
 | --- | --- |
 | Background / foreground | Page canvas and primary text |
 | Muted | Secondary text and quiet labels |
-| Accent | Primary actions and selected emphasis |
+| Accent / primary | Primary actions and selected emphasis |
 | Border | Separators and control outlines |
 | Focus | Focus ring color meeting contrast needs |
 | Radius / spacing / font | Shared rhythm |
+| Card radius | `--ds-radius-card` for widget and card chrome |
 
-Primitive components (`Button`, `Stack`, and future shell pieces) consume tokens only — no hard-coded one-off palette values in feature code when a token exists.
+Primitive components and widgets consume tokens only — no hard-coded one-off palette values in feature code when a token exists.
+
+### Appearance preferences
+
+Operator preferences are validated with Zod in `@dashora/shared`, persisted under the settings key `theme`, and applied through `@dashora/ui`’s `ThemeProvider` / `applyThemeAppearance`.
+
+| Preference | Values |
+| --- | --- |
+| Mode | `light`, `dark`, `system` |
+| Preset | `midnight` (Dashora Midnight), `aurora`, `graphite`, `porcelain` |
+| Accent | `teal`, `sky`, `emerald`, `amber`, `rose`, `violet`, `slate`, `custom` |
+| Density | `comfortable`, `compact`, `dense` |
+| Card radius | `sharp`, `soft`, `rounded` |
+| Flags | reduced transparency, reduced motion, ambient background |
+| Branding | optional app name and logo data URL |
+
+Per-dashboard overrides are stored on `dashboards.theme_json` and merge over global preferences. Open **Settings** in the top navigation (or the command menu) to reach Appearance at `/settings/appearance`. Choose **All dashboards** or **Current dashboard only** before saving. Changes preview live; save persists only the selected scope.
+
+Document attributes set by the engine: `data-theme`, `data-preset`, `data-density`, `data-card-radius`, `data-reduced-transparency`, `data-reduced-motion`, `data-ambient`.
 
 ## 12-column responsive dashboard layout
 

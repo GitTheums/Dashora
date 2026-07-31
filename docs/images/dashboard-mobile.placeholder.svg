@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="780" viewBox="0 0 390 780" role="img" aria-label="Dashora dashboard mobile placeholder">
+  <rect width="390" height="780" fill="#f4f6f8"/>
+  <rect x="16" y="16" width="358" height="44" rx="8" fill="#e2e8f0"/>
+  <text x="28" y="44" font-family="system-ui,sans-serif" font-size="14" fill="#334155">Mobile (placeholder)</text>
+  <rect x="16" y="80" width="358" height="140" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <rect x="16" y="240" width="358" height="140" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <rect x="16" y="400" width="358" height="200" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+</svg>

@@ -19,7 +19,7 @@ export async function registerProviderDiagnosticsRoutes(
       return sendApiError(reply, 401, "unauthenticated", "Authentication required");
     }
 
-    const payload = options.providers.getDiagnostics();
+    const payload = await options.providers.getDiagnostics();
     return providerDiagnosticsResponseSchema.parse(payload);
   });
 }

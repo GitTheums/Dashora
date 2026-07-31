@@ -1,3 +1,4 @@
+import { THEME_PRESET_META, type ThemeDensity, type ThemePresetId } from "@dashora/shared";
 import {
   Badge,
   Button,
@@ -93,7 +94,7 @@ function DemoSection({
 }
 
 export function DesignSystemPage() {
-  const { resolved, toggle, mode, setMode } = useTheme();
+  const { resolved, toggle, mode, setMode, preferences, patchPreferences } = useTheme();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -155,6 +156,29 @@ export function DesignSystemPage() {
               { value: "system", label: "System" },
               { value: "dark", label: "Dark" },
               { value: "light", label: "Light" },
+            ]}
+          />
+          <Select
+            aria-label="Theme preset"
+            value={preferences.preset}
+            onChange={(event) => {
+              patchPreferences({ preset: event.target.value as ThemePresetId });
+            }}
+            options={THEME_PRESET_META.map((preset) => ({
+              value: preset.id,
+              label: preset.name,
+            }))}
+          />
+          <Select
+            aria-label="Theme density"
+            value={preferences.density}
+            onChange={(event) => {
+              patchPreferences({ density: event.target.value as ThemeDensity });
+            }}
+            options={[
+              { value: "comfortable", label: "Comfortable" },
+              { value: "compact", label: "Compact" },
+              { value: "dense", label: "Dense" },
             ]}
           />
           <IconButton label="Toggle light and dark" variant="solid" onClick={toggle}>

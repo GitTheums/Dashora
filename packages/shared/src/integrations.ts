@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const GITHUB_INTEGRATION_PROVIDER = "github" as const;
 export const ICS_BASIC_AUTH_INTEGRATION_PROVIDER = "ics-basic-auth" as const;
+export const API_SECRET_INTEGRATION_PROVIDER = "api-secret" as const;
 
 export const githubIntegrationPublicSchema = z.object({
   id: z.string().uuid(),
@@ -132,4 +133,68 @@ export const deleteIcsBasicAuthIntegrationResponseSchema = z.object({
 
 export type DeleteIcsBasicAuthIntegrationResponse = z.infer<
   typeof deleteIcsBasicAuthIntegrationResponseSchema
+>;
+
+export const apiSecretIntegrationPublicSchema = z.object({
+  id: z.string().uuid(),
+  provider: z.literal(API_SECRET_INTEGRATION_PROVIDER),
+  name: z.string().min(1).max(80),
+  hasSecret: z.boolean(),
+  /** Last four characters of the stored secret when available; never the full value. */
+  secretHint: z.string().min(1).max(8).nullable(),
+  createdAt: z.string().datetime({ offset: true }),
+  updatedAt: z.string().datetime({ offset: true }),
+});
+
+export type ApiSecretIntegrationPublic = z.infer<typeof apiSecretIntegrationPublicSchema>;
+
+export const apiSecretIntegrationsResponseSchema = z.object({
+  integrations: z.array(apiSecretIntegrationPublicSchema).max(50),
+});
+
+export type ApiSecretIntegrationsResponse = z.infer<typeof apiSecretIntegrationsResponseSchema>;
+
+export const apiSecretIntegrationResponseSchema = z.object({
+  integration: apiSecretIntegrationPublicSchema,
+});
+
+export type ApiSecretIntegrationResponse = z.infer<typeof apiSecretIntegrationResponseSchema>;
+
+export const createApiSecretIntegrationRequestSchema = z.object({
+  name: z.string().trim().min(1).max(80).default("API secret"),
+  secret: z
+    .string()
+    .min(1, "Secret is required")
+    .max(4096, "Secret is too long")
+    .refine((value) => !/[\r\n\0]/.test(value), "Secret must not contain control characters"),
+});
+
+export type CreateApiSecretIntegrationRequest = z.infer<
+  typeof createApiSecretIntegrationRequestSchema
+>;
+
+export const updateApiSecretIntegrationRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    secret: z
+      .string()
+      .min(1, "Secret is required")
+      .max(4096, "Secret is too long")
+      .refine((value) => !/[\r\n\0]/.test(value), "Secret must not contain control characters")
+      .optional(),
+  })
+  .refine((value) => value.name !== undefined || value.secret !== undefined, {
+    message: "Provide a name and/or secret to update",
+  });
+
+export type UpdateApiSecretIntegrationRequest = z.infer<
+  typeof updateApiSecretIntegrationRequestSchema
+>;
+
+export const deleteApiSecretIntegrationResponseSchema = z.object({
+  deleted: z.literal(true),
+});
+
+export type DeleteApiSecretIntegrationResponse = z.infer<
+  typeof deleteApiSecretIntegrationResponseSchema
 >;

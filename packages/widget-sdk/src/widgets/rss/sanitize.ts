@@ -27,16 +27,21 @@ function decodeBasicEntities(value: string): string {
 
 /**
  * Strips tags / scripts / styles and returns collapsed plain text.
+ *
+ * Entities are decoded *before* tag-stripping (not after) so an entity-encoded tag like
+ * `&lt;script&gt;...&lt;/script&gt;` is normalized to a literal `<script>...</script>` and then
+ * removed by the tag-stripping regexes below, instead of surviving into the final text as a
+ * literal (inert, but still confusing/unexpected) tag string.
  */
 export function stripHtmlToText(input: string | undefined | null, maxLength = 500): string {
   if (!input) {
     return "";
   }
-  let text = input
+  let text = decodeBasicEntities(input);
+  text = text
     .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<\/?[^>]+>/g, " ");
-  text = decodeBasicEntities(text);
   text = text.replace(/\s+/g, " ").trim();
   if (text.length <= maxLength) {
     return text;

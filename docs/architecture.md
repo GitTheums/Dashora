@@ -12,7 +12,7 @@ apps/server       Fastify API (auth, config, secrets, widget data, cache, DB)
 packages/ui       Shared visual primitives and theme tokens
 packages/shared   Zod schemas and types shared across the wire
 packages/widget-sdk
-                  Widget contracts, states, registry helpers, demo-metrics example
+                  Widget contracts, states, registry helpers
 ```
 
 ```mermaid
@@ -86,7 +86,7 @@ Typical flow:
 
 1. Client requests widget data.
 2. If a fresh cache entry exists, return it as `success`.
-3. If a cache entry exists but is past TTL, return it immediately as `stale` and refresh in the background (or inline with a short timeout budget).
+3. If a cache entry exists but is past TTL, return it immediately as `stale` and refresh in the background (implemented in the provider platform).
 4. If refresh succeeds, store the new payload and subsequent requests see `success`.
 5. If refresh fails and last-good data exists, keep serving `stale` (or escalate to `error` after a policy threshold).
 6. If no last-good data exists, return `error` or `empty` as appropriate.

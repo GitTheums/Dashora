@@ -1,0 +1,98 @@
+# Local production-style stack: Dashora API + nginx reverse proxy for the SPA.
+# Usage:
+#   docker compose up --build
+# Open http://localhost:8080 (proxy) — API also on http://localhost:3000
+#
+# Persist data with the named volume (default) or a bind mount:
+#   DASHORA_DATA_BIND=./data docker compose up --build
+#
+# Configure timezone with TZ (IANA name), e.g. TZ=Europe/Berlin
+
+name: dashora
+
+services:
+  dashora:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      args:
+        VERSION: ${DASHORA_VERSION:-1.0.0}
+        REVISION: ${DASHORA_REVISION:-local}
+        BUILD_DATE: ${DASHORA_BUILD_DATE:-unknown}
+    image: dashora:${DASHORA_IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      # Container listen port (nginx proxies here). Publish a different host port via DASHORA_HOST_PORT.
+      PORT: "3000"
+      DASHORA_DATA_DIR: /data
+      TZ: ${TZ:-UTC}
+      CORS_ORIGIN: ${DASHORA_PUBLIC_URL:-http://localhost:8080}
+      PUBLIC_BASE_URL: ${DASHORA_PUBLIC_URL:-http://localhost:8080}
+      TRUST_PROXY: ${TRUST_PROXY:-true}
+      COOKIE_SECURE: ${COOKIE_SECURE:-auto}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_OPTIONS: --max-old-space-size=384
+      # Supply secrets at runtime only — never bake into the image.
+      # SECRETS_ENCRYPTION_KEY_FILE: /run/secrets/dashora_secrets_key
+    ports:
+      - "${DASHORA_HOST_PORT:-3000}:3000"
+    volumes:
+      - ${DASHORA_DATA_BIND:-dashora-data}:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    stop_grace_period: 30s
+
+  # One-shot: seed SPA assets from the Dashora image into a shared volume for nginx.
+  assets:
+    image: dashora:${DASHORA_IMAGE_TAG:-local}
+    pull_policy: never
+    user: "0:0"
+    volumes:
+      - dashora-web:/out
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["cp -a /srv/dashora-web/. /out/ && echo 'web assets ready'"]
+    restart: "no"
+    depends_on:
+      dashora:
+        condition: service_started
+
+  proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      dashora:
+        condition: service_healthy
+      assets:
+        condition: service_completed_successfully
+    ports:
+      - "${DASHORA_HTTP_PORT:-8080}:8080"
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/nginx.conf:ro
+      - dashora-web:/srv/dashora-web:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  dashora-data:
+  dashora-web:

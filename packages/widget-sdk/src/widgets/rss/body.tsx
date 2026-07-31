@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { widgetMutedStyle, widgetShellStyle } from "../_shared/chrome.js";
+import { VirtualList } from "../_shared/virtual-list.js";
 import type { RssData, RssItem, RssLayout } from "./config.js";
 import { formatRelativeTimestamp } from "./sanitize.js";
 
@@ -87,7 +88,10 @@ function FeedMeta({ item }: { item: RssItem }) {
 
 function CompactList({ data }: { data: RssData }) {
   return (
-    <ul
+    <VirtualList
+      items={data.items}
+      estimateSize={52}
+      getKey={(item) => item.id}
       style={{
         listStyle: "none",
         margin: 0,
@@ -96,8 +100,7 @@ function CompactList({ data }: { data: RssData }) {
         flexDirection: "column",
         gap: "0.55rem",
       }}
-    >
-      {data.items.map((item) => {
+      renderItem={(item) => {
         const link = itemLinkProps(item, data.openInNewTab);
         const titleNode = link ? (
           <a
@@ -115,19 +118,22 @@ function CompactList({ data }: { data: RssData }) {
           <span style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{item.title}</span>
         );
         return (
-          <li key={item.id}>
+          <>
             {titleNode}
             <FeedMeta item={item} />
-          </li>
+          </>
         );
-      })}
-    </ul>
+      }}
+    />
   );
 }
 
 function DetailedList({ data }: { data: RssData }) {
   return (
-    <ul
+    <VirtualList
+      items={data.items}
+      estimateSize={96}
+      getKey={(item) => item.id}
       style={{
         listStyle: "none",
         margin: 0,
@@ -136,8 +142,7 @@ function DetailedList({ data }: { data: RssData }) {
         flexDirection: "column",
         gap: "0.85rem",
       }}
-    >
-      {data.items.map((item) => {
+      renderItem={(item) => {
         const link = itemLinkProps(item, data.openInNewTab);
         const titleNode = link ? (
           <a
@@ -155,8 +160,7 @@ function DetailedList({ data }: { data: RssData }) {
           <span style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{item.title}</span>
         );
         return (
-          <li
-            key={item.id}
+          <div
             style={{
               display: "grid",
               gridTemplateColumns: data.showThumbnails && item.thumbnailUrl ? "4.5rem 1fr" : "1fr",
@@ -189,10 +193,10 @@ function DetailedList({ data }: { data: RssData }) {
               ) : null}
               <FeedMeta item={item} />
             </div>
-          </li>
+          </div>
         );
-      })}
-    </ul>
+      }}
+    />
   );
 }
 

@@ -1,6 +1,10 @@
 import {
+  apiSecretIntegrationResponseSchema,
+  apiSecretIntegrationsResponseSchema,
   githubIntegrationResponseSchema,
   githubIntegrationsResponseSchema,
+  icsBasicAuthIntegrationResponseSchema,
+  icsBasicAuthIntegrationsResponseSchema,
   setupResponseSchema,
 } from "@dashora/shared";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
@@ -136,5 +140,183 @@ describe("GitHub integration API", () => {
     const listed = githubIntegrationsResponseSchema.parse(listResponse.json());
     expect(listed.integrations).toHaveLength(1);
     expect(JSON.stringify(listResponse.json())).not.toContain("ghp_test_token_abcdef");
+  });
+
+  it("records an audit event for integration creation without leaking the token", async () => {
+    await startAuthenticated();
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/integrations/github",
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(authCookies),
+        "x-csrf-token": csrfToken,
+      },
+      payload: { name: "GitHub", token: "ghp_test_token_abcdef" },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const created = githubIntegrationResponseSchema.parse(createResponse.json());
+
+    const events = await db.repos.auditEvents.listRecent();
+    const createdEvent = events.find((event) => event.event === "integration.github.created");
+    expect(createdEvent).toMatchObject({ success: true, actorEmail: "github@example.com" });
+    expect(createdEvent?.metadata).toMatchObject({ integrationId: created.integration.id });
+    expect(JSON.stringify(events)).not.toContain("ghp_test_token_abcdef");
+
+    const deleteResponse = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/integrations/github/${created.integration.id}`,
+      headers: { cookie: cookieHeader(authCookies), "x-csrf-token": csrfToken },
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+
+    const eventsAfterDelete = await db.repos.auditEvents.listRecent();
+    expect(
+      eventsAfterDelete.find((event) => event.event === "integration.github.deleted"),
+    ).toMatchObject({ success: true, actorEmail: "github@example.com" });
+  });
+});
+
+describe("ICS basic-auth and API secret integration APIs", () => {
+  let db: TestDatabase;
+  let app: FastifyInstance;
+  let authCookies: Record<string, string>;
+  let csrfToken: string;
+
+  afterEach(async () => {
+    if (app) {
+      await app.close();
+    }
+    if (db) {
+      db.cleanup();
+    }
+  });
+
+  async function startAuthenticated() {
+    db = createTestDatabase();
+    const env = createTestServerEnv({
+      PUBLIC_BASE_URL: "http://localhost:5173",
+    });
+    const setup = createSetupService({
+      db: db.db,
+      setupTokenTtlMs: env.SETUP_TOKEN_TTL_MS,
+      nodeEnv: env.NODE_ENV,
+    });
+    app = await buildApp({
+      version: "0.1.0-test",
+      logger: false,
+      database: db,
+      setup,
+      env,
+    });
+
+    const csrfResponse = await app.inject({ method: "GET", url: "/api/v1/auth/csrf" });
+    const csrfCookies = parseCookies(csrfResponse);
+    const setupToken = setup.getPlaintextForTests();
+    if (!setupToken) {
+      throw new Error("expected setup token");
+    }
+
+    const setupResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/setup/complete",
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(csrfCookies),
+        "x-csrf-token": csrfResponse.json().csrfToken as string,
+      },
+      payload: {
+        token: setupToken,
+        email: "integrations@example.com",
+        password: "correct-horse-battery-staple",
+        displayName: "Integrations",
+      },
+    });
+    expect(setupResponse.statusCode).toBe(200);
+    setupResponseSchema.parse(setupResponse.json());
+    authCookies = { ...csrfCookies, ...parseCookies(setupResponse) };
+
+    const refreshedCsrf = await app.inject({
+      method: "GET",
+      url: "/api/v1/auth/csrf",
+      headers: { cookie: cookieHeader(authCookies) },
+    });
+    authCookies = { ...authCookies, ...parseCookies(refreshedCsrf) };
+    csrfToken = refreshedCsrf.json().csrfToken as string;
+  }
+
+  it("stores ICS credentials without returning the password", async () => {
+    await startAuthenticated();
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/integrations/ics-basic-auth",
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(authCookies),
+        "x-csrf-token": csrfToken,
+      },
+      payload: {
+        name: "Work calendar",
+        username: "calendar-user",
+        password: "calendar-password-secret",
+      },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const created = icsBasicAuthIntegrationResponseSchema.parse(createResponse.json());
+    expect(created.integration.hasCredentials).toBe(true);
+    expect(created.integration.usernameHint).toBe("calendar-user");
+    expect(JSON.stringify(createResponse.json())).not.toContain("calendar-password-secret");
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/integrations/ics-basic-auth",
+      headers: { cookie: cookieHeader(authCookies) },
+    });
+    expect(listResponse.statusCode).toBe(200);
+    const listed = icsBasicAuthIntegrationsResponseSchema.parse(listResponse.json());
+    expect(listed.integrations).toHaveLength(1);
+    expect(JSON.stringify(listResponse.json())).not.toContain("calendar-password-secret");
+
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/api/v1/integrations/ics-basic-auth/${created.integration.id}`,
+      headers: { cookie: cookieHeader(authCookies), "x-csrf-token": csrfToken },
+    });
+    expect(deleted.statusCode).toBe(200);
+  });
+
+  it("stores API secrets without returning the secret value", async () => {
+    await startAuthenticated();
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/integrations/api-secret",
+      headers: {
+        "content-type": "application/json",
+        cookie: cookieHeader(authCookies),
+        "x-csrf-token": csrfToken,
+      },
+      payload: {
+        name: "Custom API",
+        secret: "super-secret-api-key-value",
+      },
+    });
+    expect(createResponse.statusCode).toBe(201);
+    const created = apiSecretIntegrationResponseSchema.parse(createResponse.json());
+    expect(created.integration.hasSecret).toBe(true);
+    expect(created.integration.secretHint).toBe("alue");
+    expect(JSON.stringify(createResponse.json())).not.toContain("super-secret-api-key-value");
+
+    const listResponse = await app.inject({
+      method: "GET",
+      url: "/api/v1/integrations/api-secret",
+      headers: { cookie: cookieHeader(authCookies) },
+    });
+    expect(listResponse.statusCode).toBe(200);
+    const listed = apiSecretIntegrationsResponseSchema.parse(listResponse.json());
+    expect(listed.integrations).toHaveLength(1);
+    expect(JSON.stringify(listResponse.json())).not.toContain("super-secret-api-key-value");
   });
 });

@@ -1,14 +1,18 @@
-# Git
+# Git / CI
 .git
 .gitignore
 .gitattributes
+.github
 
-# Dependencies & local env
+# Dependencies & local env (never bake secrets)
 node_modules
 .pnpm-store
 **/.env
 **/.env.*
 !**/.env.example
+**/data
+**/*.sqlite
+**/*.sqlite-*
 
 # Build artifacts & caches
 **/dist
@@ -19,23 +23,33 @@ node_modules
 **/playwright-report
 **/test-results
 
-# Docs & IDE (not needed in runtime images)
+# Docs & IDE (not needed to build the image)
 docs
 .cursor
 .vscode
 *.md
 !README.md
+!infra/nginx.conf
 
-# Tests
+# Tests and local tooling
 **/*.test.ts
 **/*.test.tsx
 **/*.spec.ts
 **/*.spec.tsx
 **/vitest.config.ts
 **/playwright.config.ts
+scripts
+e2e
+**/e2e
+
+# Compose / agent noise
+compose.yaml
+compose.dev.yaml
+agent-transcripts
 
 # Misc
 .DS_Store
 Thumbs.db
 tmp
 temp
+.deploy-test

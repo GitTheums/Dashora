@@ -36,6 +36,7 @@
     "vitest": "^3.0.9"
   },
   "dependencies": {
+    "@dashora/shared": "workspace:*",
     "@fontsource/geist-mono": "^5.3.0",
     "@fontsource/geist-sans": "^5.3.0"
   }

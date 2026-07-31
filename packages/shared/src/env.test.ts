@@ -59,6 +59,7 @@ describe("parseServerEnv", () => {
   it("parses provider HTTP defaults", () => {
     const env = parseServerEnv({}, { version: "0.1.0" });
     expect(env.PROVIDER_USER_AGENT).toContain("Dashora/0.1.0");
+    expect(env.PROVIDER_USER_AGENT).toContain("https://github.com/GitTheums/Dashora");
     expect(env.PROVIDER_CONNECT_TIMEOUT_MS).toBe(5_000);
     expect(env.PROVIDER_REQUEST_TIMEOUT_MS).toBe(15_000);
     expect(env.PROVIDER_MAX_RESPONSE_BYTES).toBe(2_000_000);

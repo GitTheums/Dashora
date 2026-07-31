@@ -10,6 +10,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     name: Lint, typecheck, test, build
@@ -34,14 +37,120 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Format-only CI mode (no --write). Full lint+format also covered by `pnpm lint`.
+      - name: Format check
+        run: pnpm exec biome ci --linter-enabled=false --organize-imports-enabled=false --assists-enabled=false .
+
       - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
+      # Workspace `pnpm test` covers unit and integration tests (no separate script).
+      - name: Unit and integration tests
         run: pnpm test
+
+      - name: Coverage thresholds (critical packages)
+        run: pnpm test:coverage
 
       - name: Build
         run: pnpm build
+
+      - name: Dependency audit (report-only)
+        # Non-blocking: surfaces new high/critical advisories in the PR log without failing the
+        # build, since transitive dev-tooling advisories (see SECURITY.md) can't always be fixed
+        # immediately. Review this output on every PR rather than gating merges on it.
+        run: pnpm audit --audit-level=high || true
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-diagnostics-${{ github.run_id }}
+          path: |
+            apps/**/coverage
+            packages/**/coverage
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e:
+    name: Playwright E2E, a11y, visual
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @dashora/web exec playwright install --with-deps chromium
+
+      - name: Build packages
+        run: pnpm run build:packages
+
+      - name: Run Playwright suite
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  container:
+    name: Docker image smoke (amd64) + multi-arch build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Container smoke test (linux/amd64)
+        env:
+          DASHORA_REQUIRE_DOCKER: "1"
+          DASHORA_SMOKE_IMAGE: dashora:smoke
+        run: pnpm test:container
+
+      - name: Multi-arch build (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          outputs: type=cacheonly
+          build-args: |
+            VERSION=0.0.0-ci
+            REVISION=${{ github.sha }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

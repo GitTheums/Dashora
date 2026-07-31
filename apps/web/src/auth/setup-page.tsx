@@ -115,7 +115,7 @@ export function SetupPage({ api, token, onAuthenticated }: SetupPageProps) {
           autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          hint="At least 12 characters."
+          hint="At least 12 characters. Avoid common passwords or your email address."
           required
         />
         <Input

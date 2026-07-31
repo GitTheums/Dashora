@@ -1,0 +1,23 @@
+# Development image: Node.js LTS + toolchain for native modules + pnpm.
+# Source is bind-mounted by compose.dev.yaml; dependencies install at container start
+# into named volumes so Linux native addons are not mixed with the host OS.
+
+ARG NODE_VERSION=22
+
+FROM node:${NODE_VERSION}-bookworm
+
+ENV PNPM_HOME="/pnpm" \
+    PATH="/pnpm:$PATH" \
+    CI=true \
+    TZ=UTC
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ tzdata \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
+
+WORKDIR /app
+
+EXPOSE 3000 5173
+
+CMD ["sh", "-c", "pnpm config set store-dir /pnpm/store && pnpm install --frozen-lockfile && pnpm dev"]

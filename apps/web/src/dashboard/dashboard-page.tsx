@@ -1,8 +1,8 @@
 import type { CreatePageRequest, Page, UpdatePageRequest } from "@dashora/shared";
 import { Button, EmptyState, ErrorState, Skeleton, Stack } from "@dashora/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AppSession } from "../app.js";
-import { navigate } from "../auth/routing.js";
+import { getPath, navigate } from "../auth/routing.js";
+import { isSettingsPath } from "../settings/paths.js";
 import type { DashboardApi } from "./api.js";
 import { DashboardEditModeProvider, useDashboardEditMode } from "./edit-mode-context.js";
 import { DashboardLayoutEngine } from "./layout/dashboard-layout-engine.js";
@@ -14,7 +14,6 @@ import { useDashboard } from "./use-dashboard.js";
 
 export type DashboardPageProps = {
   appName: string;
-  session?: AppSession;
   api?: DashboardApi;
 };
 
@@ -23,23 +22,21 @@ type EditorState =
   | { open: true; mode: "create" }
   | { open: true; mode: "edit"; page: Page };
 
-export function DashboardPage({ appName, session, api: apiProp }: DashboardPageProps) {
+export function DashboardPage({ appName, api: apiProp }: DashboardPageProps) {
   const api = useMemo(() => apiProp ?? createMemoryDashboardApi(), [apiProp]);
 
   return (
     <DashboardEditModeProvider>
-      <DashboardPageInner appName={appName} api={api} {...(session ? { session } : {})} />
+      <DashboardPageInner appName={appName} api={api} />
     </DashboardEditModeProvider>
   );
 }
 
 function DashboardPageInner({
   appName,
-  session,
   api,
 }: {
   appName: string;
-  session?: AppSession;
   api: DashboardApi;
 }) {
   const dashboard = useDashboard(api);
@@ -203,15 +200,6 @@ function DashboardPageInner({
         {modeAnnouncement}
       </output>
 
-      {session ? (
-        <div className="app-header__session">
-          <span className="app-header__session-label">Signed in as {session.displayName}</span>
-          <Button type="button" variant="ghost" size="sm" onClick={session.onSignOut}>
-            Sign out
-          </Button>
-        </div>
-      ) : null}
-
       <header className="app-header__nav-sticky">
         <TopNav
           pages={pages}
@@ -234,6 +222,8 @@ function DashboardPageInner({
             void movePage(page, direction);
           }}
           canDeletePages={pages.length > 1}
+          returnToPath={activePage ? pagePath(activePage.slug) : getPath()}
+          settingsActive={isSettingsPath(getPath())}
         />
       </header>
 

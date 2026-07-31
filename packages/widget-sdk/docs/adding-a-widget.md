@@ -119,7 +119,7 @@ Return a shared envelope from the HTTP layer with `createWidgetDataResponse`.
 
 - Renderer props: `WidgetRendererProps<TData, TConfig>`
 - Settings props: `WidgetSettingsProps<TConfig>`
-- Handle all eight states in the renderer (copy the `demo-metrics` switch as a starting point)
+- Handle all eight states in the renderer (use an existing production widget renderer as a starting point)
 
 ### 5. Register
 
@@ -156,28 +156,7 @@ Unknown widget ids must fail when saving layout or config (`registry.require`).
 
 ## Reference implementation
 
-See `packages/widget-sdk/src/examples/demo-metrics/`:
-
-- Zod config + schema v1→v2 migration
-- In-memory cache / stale-while-revalidate demo provider
-- Settings form with a `forceState` control for visual QA
-- Renderer covering every state
-- Tests under `demo-metrics.test.ts` and `demo-metrics.ui.test.tsx`
-
-Import the example as:
-
-```ts
-import {
-  demoMetricsDefinition,
-  demoMetricsProvider,
-  DemoMetricsRenderer,
-  DemoMetricsSettings,
-} from "@dashora/widget-sdk/examples/demo-metrics";
-```
-
-`demo-metrics` is a **developer example only** — not a production dashboard widget.
-
-Production widgets live under `packages/widget-sdk/src/widgets/` and are documented in [First-party widgets](../../../docs/widgets/first-party.md).
+Production widgets live under `packages/widget-sdk/src/widgets/` and are documented in [First-party widgets](../../../docs/widgets/first-party.md). Copy patterns from a simple widget such as Clock or Bookmarks when adding a new one.
 
 ## Capability flags
 

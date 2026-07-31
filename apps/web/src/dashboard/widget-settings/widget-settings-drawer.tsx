@@ -4,8 +4,8 @@ import type {
   PlaceholderWidget,
   TypedWidgetInstance,
 } from "@dashora/shared";
-import { Button, Dialog, DialogBody, Drawer, Input, Select, Switch } from "@dashora/ui";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Dialog, DialogBody, Drawer, Input, Select, Skeleton, Switch } from "@dashora/ui";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import {
   type WidgetCatalogEntry,
@@ -327,17 +327,19 @@ export function WidgetSettingsDrawer({
                   {errors.config}
                 </p>
               ) : null}
-              <SettingsComponent
-                instanceId={draft.id}
-                config={draft.config}
-                onChange={(config) => {
-                  setDraft({
-                    ...draft,
-                    config: config as Record<string, unknown>,
-                  });
-                  setErrors((prev) => clearFieldError(prev, "config"));
-                }}
-              />
+              <Suspense fallback={<Skeleton height="10rem" />}>
+                <SettingsComponent
+                  instanceId={draft.id}
+                  config={draft.config}
+                  onChange={(config: unknown) => {
+                    setDraft({
+                      ...draft,
+                      config: config as Record<string, unknown>,
+                    });
+                    setErrors((prev) => clearFieldError(prev, "config"));
+                  }}
+                />
+              </Suspense>
             </div>
           ) : null}
         </div>

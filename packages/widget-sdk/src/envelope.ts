@@ -14,6 +14,8 @@ export const widgetResponseMetaSchema = z.object({
   /** ISO-8601 timestamp after which the client should treat data as stale. */
   staleAt: z.string().datetime({ offset: true }).optional(),
   cache: widgetCacheStatusSchema.optional(),
+  /** Server-side wall time to resolve this widget payload (milliseconds). */
+  durationMs: z.number().nonnegative().optional(),
   /** Config schema version used to interpret instance settings for this response. */
   schemaVersion: z.number().int().min(1),
   /** Widget package / definition version string. */

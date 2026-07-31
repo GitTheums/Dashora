@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRepositories } from "../db/repositories/index.js";
 import { type TestDatabase, createTestDatabase } from "../db/test-utils.js";
 import { createTestServerEnv } from "../test/env.js";
@@ -59,15 +59,22 @@ describe("provider platform", () => {
     expect(second.result.fromCache).toBe(true);
     expect(upstream.requestCount()).toBe(1);
 
-    const metrics = platform.getDiagnostics().cache;
+    const metrics = (await platform.getDiagnostics()).cache;
     expect(metrics.hits).toBeGreaterThanOrEqual(1);
     expect(metrics.stores).toBeGreaterThanOrEqual(1);
+    expect(metrics.entryCount).toBeGreaterThanOrEqual(1);
+    expect(metrics.hitRate ?? 0).toBeGreaterThan(0);
   });
 
-  it("uses ETag conditional requests while serving stale data", async () => {
+  it("returns stale immediately and revalidates in the background", async () => {
     let body = { value: 1 };
-    upstream = await startMockUpstream((req, res) => {
+    let releaseRevalidate: (() => void) | undefined;
+    const revalidateGate = new Promise<void>((resolve) => {
+      releaseRevalidate = resolve;
+    });
+    upstream = await startMockUpstream(async (req, res) => {
       if (req.headers["if-none-match"] === '"v1"') {
+        await revalidateGate;
         res.statusCode = 304;
         res.end();
         return;
@@ -96,14 +103,21 @@ describe("provider platform", () => {
 
     now = 1_000 + 1_500;
     body = { value: 2 };
+    const beforeBackground = upstream.requestCount();
+    // Resolves while background revalidation is intentionally blocked — proves SWR
+    // does not wait on upstream before returning stale.
     const stale = await platform.fetchJson<{ value: number }>({
       providerId: "weather",
       url: `${upstream.baseUrl}/wx`,
     });
     expect(stale.data.value).toBe(1);
-    expect(stale.result.response.notModified).toBe(true);
     expect(stale.result.cacheStatus).toBe("stale");
-    expect(upstream.requestCount()).toBe(2);
+    expect(stale.result.fromCache).toBe(true);
+
+    releaseRevalidate?.();
+    await vi.waitFor(() => {
+      expect(upstream?.requestCount()).toBeGreaterThan(beforeBackground);
+    });
   });
 
   it("deduplicates concurrent identical requests", async () => {
@@ -122,7 +136,7 @@ describe("provider platform", () => {
     expect(a.text).toBe("shared");
     expect(b.text).toBe("shared");
     expect(upstream.requestCount()).toBe(1);
-    const entry = platform.getDiagnostics().providers.find((p) => p.id === "rss");
+    const entry = (await platform.getDiagnostics()).providers.find((p) => p.id === "rss");
     expect(entry?.counters.deduplicated).toBeGreaterThanOrEqual(1);
   });
 
@@ -196,7 +210,7 @@ describe("provider platform", () => {
       }),
     ).rejects.toMatchObject({ code: "circuit_open" });
 
-    const diagnostics = platform.getDiagnostics();
+    const diagnostics = await platform.getDiagnostics();
     const entry = diagnostics.providers.find((p) => p.id === "flaky");
     expect(entry?.circuitState).toBe("open");
     expect(entry?.status).toBe("open");

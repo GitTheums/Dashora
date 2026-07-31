@@ -67,11 +67,27 @@ export function createServerEnvSchema(defaults: { version: string }) {
       .int()
       .positive()
       .default(15 * 60 * 1000),
+    /** Max first-run setup completion attempts per IP within the rate-limit window. */
+    SETUP_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+    /** Setup rate-limit window in milliseconds. Default 15 minutes. */
+    SETUP_RATE_LIMIT_WINDOW_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(15 * 60 * 1000),
+    /** General API rate-limit max requests per window (abuse/DoS backstop). */
+    API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+    /** General API rate-limit window in milliseconds. Default 1 minute. */
+    API_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+    /** HSTS max-age in seconds when the connection is treated as HTTPS. Default 180 days. */
+    HSTS_MAX_AGE_SECONDS: z.coerce.number().int().nonnegative().default(15_552_000),
+    /** Global Fastify request body size limit in bytes. */
+    MAX_BODY_BYTES: z.coerce.number().int().positive().default(1_000_000),
     /** Outbound User-Agent for provider HTTP requests. */
     PROVIDER_USER_AGENT: z
       .string()
       .min(1)
-      .default(`Dashora/${defaults.version} (+https://github.com/dashora/dashora)`),
+      .default(`Dashora/${defaults.version} (+https://github.com/GitTheums/Dashora)`),
     /** Time allowed to establish a TCP/TLS connection, in milliseconds. */
     PROVIDER_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
     /** Total outbound request budget (including body read), in milliseconds. */
@@ -115,6 +131,20 @@ export function createServerEnvSchema(defaults: { version: string }) {
      * Never exposed to the browser.
      */
     FINNHUB_API_KEY: z.string().trim().min(1).max(256).optional(),
+    /**
+     * Optional Reddit OAuth application credentials for the Reddit widget.
+     * Never exposed to the browser.
+     */
+    REDDIT_CLIENT_ID: z.string().trim().min(1).max(256).optional(),
+    REDDIT_CLIENT_SECRET: z.string().trim().min(1).max(256).optional(),
+    /**
+     * Optional Twitch Helix application credentials for the Twitch widget.
+     * Never exposed to the browser.
+     */
+    TWITCH_CLIENT_ID: z.string().trim().min(1).max(256).optional(),
+    TWITCH_CLIENT_SECRET: z.string().trim().min(1).max(256).optional(),
+    /** Maximum accepted request body size for config-backup import uploads, in bytes. */
+    BACKUP_IMPORT_MAX_BYTES: z.coerce.number().int().positive().default(8_000_000),
   });
 }
 

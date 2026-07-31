@@ -136,6 +136,7 @@ describe("dashboard and page APIs", () => {
     expect(response.statusCode).toBe(200);
     const body = dashboardResponseSchema.parse(response.json());
     expect(body.dashboard.slug).toBe("default");
+    expect(body.dashboard.themeOverride).toBeNull();
     expect(body.dashboard.pages.map((page) => page.slug)).toEqual(
       DEFAULT_DASHBOARD_PAGES.map((page) => page.slug),
     );
@@ -143,6 +144,38 @@ describe("dashboard and page APIs", () => {
       DEFAULT_DASHBOARD_PAGES.map((page) => page.name),
     );
     expect(body.dashboard.pages.map((page) => page.sortOrder)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("stores and clears per-dashboard theme overrides", async () => {
+    await startAuthenticated();
+
+    const setOverride = await mutating("PATCH", "/api/v1/dashboard/theme", {
+      themeOverride: { preset: "porcelain", density: "dense" },
+    });
+    expect(setOverride.statusCode).toBe(200);
+    expect(setOverride.json()).toMatchObject({
+      themeOverride: { preset: "porcelain", density: "dense" },
+    });
+
+    const reload = dashboardResponseSchema.parse(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/v1/dashboard",
+          headers: { cookie: cookieHeader(authCookies) },
+        })
+      ).json(),
+    );
+    expect(reload.dashboard.themeOverride).toEqual({
+      preset: "porcelain",
+      density: "dense",
+    });
+
+    const clear = await mutating("PATCH", "/api/v1/dashboard/theme", {
+      themeOverride: null,
+    });
+    expect(clear.statusCode).toBe(200);
+    expect(clear.json()).toMatchObject({ themeOverride: null });
   });
 
   it("rejects duplicate slugs within a dashboard", async () => {

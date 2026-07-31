@@ -9,10 +9,19 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
+  Skeleton,
   cx,
 } from "@dashora/ui";
 import type { WidgetState } from "@dashora/widget-sdk";
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  Suspense,
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { MoreIcon, RefreshIcon } from "../icons.js";
 import { type WidgetCatalogEntry, catalogEntryForInstance } from "../widget-library/catalog.js";
 import { getWidgetDefinition, getWidgetRenderer } from "./registry.js";
@@ -67,11 +76,9 @@ export type WidgetInstanceCardProps = {
   onToggleEnabled: () => void;
   onRemove: () => void;
   onResetConfig: () => void;
-  onRefresh: () => void;
-  refreshToken: number;
 };
 
-export function WidgetInstanceCard({
+export const WidgetInstanceCard = memo(function WidgetInstanceCard({
   widget,
   editMode,
   selected,
@@ -83,12 +90,20 @@ export function WidgetInstanceCard({
   onToggleEnabled,
   onRemove,
   onResetConfig,
-  onRefresh,
-  refreshToken,
 }: WidgetInstanceCardProps) {
   const catalog = catalogEntryForInstance(widget);
   const supportsRefresh = catalog?.capabilities.supportsManualRefresh ?? true;
-  const lastUpdated = formatLastUpdated(widget.lastUpdatedAt ?? null);
+  // Keep refresh state local so one widget refresh does not re-render the grid.
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [displayUpdatedAt, setDisplayUpdatedAt] = useState<number | null>(
+    widget.lastUpdatedAt ?? null,
+  );
+  const lastUpdated = formatLastUpdated(displayUpdatedAt);
+
+  const handleRefresh = () => {
+    setRefreshToken((token) => token + 1);
+    setDisplayUpdatedAt(Date.now());
+  };
   const configurationRequired = needsConfiguration(widget, catalog);
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
@@ -155,7 +170,7 @@ export function WidgetInstanceCard({
               disabled={!widget.enabled}
               onClick={(event) => {
                 event.stopPropagation();
-                onRefresh();
+                handleRefresh();
               }}
             >
               <RefreshIcon />
@@ -223,7 +238,7 @@ export function WidgetInstanceCard({
       </footer>
     </article>
   );
-}
+});
 
 function ConfigurationRequiredBody({
   editMode,
@@ -290,6 +305,8 @@ function TypedWidgetBody({
   const [state, setState] = useState<WidgetState>("loading");
   const [data, setData] = useState<unknown>();
   const [message, setMessage] = useState<string | undefined>();
+  const dataRef = useRef<unknown>(undefined);
+  dataRef.current = data;
 
   const parsedConfig = useMemo(() => {
     if (!definition) {
@@ -300,11 +317,13 @@ function TypedWidgetBody({
   }, [definition, widget.config]);
 
   useEffect(() => {
-    let cancelled = false;
-    // Include refreshToken so chrome refresh bumps force a reload.
-    const requestKey = `${widget.id}:${widget.type}:${refreshToken}`;
-    setState("loading");
-    setMessage(undefined);
+    const controller = new AbortController();
+    const hasExistingData = dataRef.current !== undefined;
+    // Keep prior content visible while refreshing to avoid layout shift.
+    setState(hasExistingData ? "refreshing" : "loading");
+    if (!hasExistingData) {
+      setMessage(undefined);
+    }
 
     void (async () => {
       try {
@@ -313,25 +332,31 @@ function TypedWidgetBody({
           widget.id,
           parsedConfig,
           widget.enabled,
+          {
+            forceRefresh: refreshToken > 0,
+            signal: controller.signal,
+          },
         );
-        if (cancelled || requestKey.length === 0) {
+        if (controller.signal.aborted) {
           return;
         }
         setState(payload.state);
         setData(payload.data);
         setMessage(payload.message);
       } catch (error) {
-        if (cancelled) {
+        if (controller.signal.aborted) {
           return;
         }
         setState("error");
-        setData(undefined);
+        if (!hasExistingData) {
+          setData(undefined);
+        }
         setMessage(error instanceof Error ? error.message : "Could not load widget data.");
       }
     })();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [parsedConfig, refreshToken, widget.enabled, widget.id, widget.type]);
 
@@ -355,13 +380,15 @@ function TypedWidgetBody({
   }
 
   return (
-    <Renderer
-      instanceId={widget.id}
-      title={widget.title}
-      config={parsedConfig}
-      state={state}
-      {...(data !== undefined ? { data } : {})}
-      {...(message !== undefined ? { message } : {})}
-    />
+    <Suspense fallback={<Skeleton height="8rem" />}>
+      <Renderer
+        instanceId={widget.id}
+        title={widget.title}
+        config={parsedConfig}
+        state={state}
+        {...(data !== undefined ? { data } : {})}
+        {...(message !== undefined ? { message } : {})}
+      />
+    </Suspense>
   );
 }

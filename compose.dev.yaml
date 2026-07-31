@@ -1,0 +1,72 @@
+# Development stack with bind-mounted source and hot reload.
+# Usage:
+#   docker compose -f compose.dev.yaml up --build
+# Web: http://localhost:5173  API: http://localhost:3000
+#
+# Data persists in the dashora-dev-data volume (or bind via DASHORA_DATA_BIND).
+# Timezone: TZ=Europe/Berlin docker compose -f compose.dev.yaml up
+#
+# Named volumes keep Linux-built native modules off the host bind mount
+# (important on Docker Desktop for Windows/macOS).
+
+name: dashora-dev
+
+services:
+  dashora:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.dev
+    image: dashora:dev
+    working_dir: /app
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: ${DASHORA_PORT:-3000}
+      DASHORA_DATA_DIR: /data
+      TZ: ${TZ:-UTC}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING:-true}
+    ports:
+      - "${DASHORA_HOST_PORT:-3000}:${DASHORA_PORT:-3000}"
+      - "${DASHORA_WEB_PORT:-5173}:5173"
+    volumes:
+      - .:/app
+      - ${DASHORA_DATA_BIND:-dashora-dev-data}:/data
+      - dashora-dev-node-modules:/app/node_modules
+      - dashora-dev-server-modules:/app/apps/server/node_modules
+      - dashora-dev-web-modules:/app/apps/web/node_modules
+      - dashora-dev-shared-modules:/app/packages/shared/node_modules
+      - dashora-dev-ui-modules:/app/packages/ui/node_modules
+      - dashora-dev-sdk-modules:/app/packages/widget-sdk/node_modules
+      - dashora-pnpm-store:/pnpm/store
+    command:
+      [
+        "sh",
+        "-c",
+        "pnpm config set store-dir /pnpm/store && pnpm install --frozen-lockfile && pnpm dev",
+      ]
+    stop_grace_period: 15s
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/v1/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+volumes:
+  dashora-dev-data:
+  dashora-dev-node-modules:
+  dashora-dev-server-modules:
+  dashora-dev-web-modules:
+  dashora-dev-shared-modules:
+  dashora-dev-sdk-modules:
+  dashora-pnpm-store:
