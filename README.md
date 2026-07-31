@@ -132,6 +132,29 @@ Dashora and Rackora are related by naming and design philosophy, but solve diffe
 
 ---
 
+## How the production stack works
+
+The recommended Docker Compose deployment contains three services:
+
+| Service | Purpose | Expected state |
+| --- | --- | --- |
+| `dashora` | Fastify API, authentication, SQLite, integrations, and widget providers | Running and healthy |
+| `assets` | Copies the built frontend into the shared web-assets volume | Exits successfully with code `0` |
+| `proxy` | nginx web server for the frontend and reverse proxy for `/api` | Running and healthy |
+
+> [!IMPORTANT]
+> Open the nginx port for the normal Dashora interface. Opening the API port directly returns JSON instead of the web application.
+
+| Address | Purpose |
+| --- | --- |
+| `http://SERVER-IP:8080` | Normal Dashora web interface |
+| `http://SERVER-IP:3000/api/v1/health` | Direct API health endpoint |
+| `http://localhost:5173` | Vite development server only; not used by the production image |
+
+`localhost` always refers to the machine on which the browser or command is running. From another computer, replace it with the IP address or hostname of the Docker server.
+
+---
+
 ## Quick start
 
 ### Requirements
@@ -143,48 +166,85 @@ Dashora and Rackora are related by naming and design philosophy, but solve diffe
 
 ### Recommended: published GHCR image
 
-Clone the repository so Compose can use the included nginx configuration:
+Clone the repository so Compose can use the included nginx configuration and service definitions:
 
 ```bash
 git clone https://github.com/GitTheums/Dashora.git
 cd Dashora
 ```
 
-Create a small registry override:
+Create a registry-image override:
 
 ```bash
 cat > compose.ghcr.yaml <<'YAML'
 services:
   dashora:
-    image: ghcr.io/gittheums/dashora:1.0.0
+    image: ghcr.io/gittheums/dashora:1.0.1
     pull_policy: always
 
   assets:
-    image: ghcr.io/gittheums/dashora:1.0.0
+    image: ghcr.io/gittheums/dashora:1.0.1
     pull_policy: always
 YAML
+```
+
+Set the public URL. Replace the example address with the LAN IP, hostname, or HTTPS URL through which you will open Dashora:
+
+```bash
+cat > .env <<'ENV'
+DASHORA_PUBLIC_URL=http://192.168.1.100:8080
+TZ=Europe/Amsterdam
+ENV
+```
+
+Validate the final Compose configuration before starting:
+
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml config
 ```
 
 Start Dashora:
 
 ```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml pull
 docker compose -f compose.yaml -f compose.ghcr.yaml up -d
 ```
 
+Check the services:
+
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml ps
+docker compose -f compose.yaml -f compose.ghcr.yaml ps -a
+```
+
+Expected result:
+
+- `dashora` is running and healthy;
+- `proxy` is running and healthy;
+- `assets` is `Exited (0)` after copying the frontend files.
+
 Open:
 
-| URL | Purpose |
-| --- | --- |
-| `http://localhost:8080` | Dashora web interface and API through nginx |
-| `http://localhost:3000/api/v1/health` | Direct API health endpoint |
+```text
+http://SERVER-IP:8080
+```
 
-For a production deployment, pin an exact image version rather than relying on `latest`.
+For example:
+
+```text
+http://192.168.1.100:8080
+```
+
+> [!NOTE]
+> Port `3000` is the API, not the normal web interface. Port `5173` is development-only.
 
 ### Build from source
 
 ```bash
 git clone https://github.com/GitTheums/Dashora.git
 cd Dashora
+
+docker compose config
 docker compose up --build -d
 ```
 
@@ -194,13 +254,20 @@ docker compose up --build -d
 # Container status
 docker compose -f compose.yaml -f compose.ghcr.yaml ps
 
+# Include one-shot services such as assets
+docker compose -f compose.yaml -f compose.ghcr.yaml ps -a
+
 # Follow application logs
 docker compose -f compose.yaml -f compose.ghcr.yaml logs -f dashora
 
-# Find the first-run setup URL
-docker compose -f compose.yaml -f compose.ghcr.yaml logs dashora | grep -i setup
+# Follow proxy logs
+docker compose -f compose.yaml -f compose.ghcr.yaml logs -f proxy
 
-# Stop the stack without deleting persistent data
+# Find a newly generated setup URL
+docker compose -f compose.yaml -f compose.ghcr.yaml logs --since=2m dashora \
+  | grep -F "Dashora first-run setup required"
+
+# Stop without deleting persistent volumes
 docker compose -f compose.yaml -f compose.ghcr.yaml down
 ```
 
@@ -212,18 +279,70 @@ Full installation instructions: [`docs/installation.md`](docs/installation.md).
 
 A new Dashora installation does not create a default administrator account.
 
-On the first start, Dashora generates a single-use setup token and writes a setup URL to the application logs:
+On the first start with an empty database, Dashora generates a single-use setup token and writes the plaintext setup URL to the application logs:
 
 ```text
-Dashora first-run setup required. Open: http://localhost:8080/setup?token=...
+Dashora first-run setup required. Open: http://SERVER-IP:8080/setup?token=...
 ```
 
-1. Read the URL from the logs.
-2. Open it in a trusted browser on the same network.
-3. Create the operator account.
-4. Sign in and build your first page.
+Retrieve it immediately:
 
-The token is stored only as a hash, expires automatically, is rate-limited, and becomes invalid after successful setup.
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml logs --since=2m dashora \
+  | grep -F "Dashora first-run setup required"
+```
+
+Then:
+
+1. Open the complete URL from the logs.
+2. Create the operator account.
+3. Sign in.
+4. Add and arrange your first widgets.
+
+### Important token behavior
+
+- Only a hash of the setup token is stored in SQLite.
+- The plaintext token is logged only when a new token is generated.
+- Restarting Dashora while the same token is still valid does **not** print the plaintext token again.
+- The token expires automatically, is rate-limited, and becomes invalid after successful setup.
+
+### Lost setup token on a brand-new installation
+
+Check whether setup is still required:
+
+```bash
+curl -fsS http://localhost:8080/api/v1/setup/status
+```
+
+Only continue when:
+
+- the response says setup is required;
+- this is a completely new installation;
+- no valuable Dashora data exists.
+
+> [!CAUTION]
+> Resetting the database deletes users, dashboards, widgets, tasks, settings, and integrations. Never use this procedure on an installation containing data you want to keep.
+
+For a new installation using named volumes:
+
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml down -v
+docker compose -f compose.yaml -f compose.ghcr.yaml up -d
+
+docker compose -f compose.yaml -f compose.ghcr.yaml logs --since=2m dashora \
+  | grep -F "Dashora first-run setup required"
+```
+
+For a bind-mounted data directory, back it up and remove only the unfinished SQLite files:
+
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml down
+
+cp -a ./data "./data-backup-$(date +%Y%m%d-%H%M%S)"
+rm -f ./data/dashora.sqlite ./data/dashora.sqlite-wal ./data/dashora.sqlite-shm
+
+docker compose -f compose.yaml -f compose.ghcr.yaml up -d
+```
 
 ---
 
@@ -262,22 +381,53 @@ Dashora stores persistent application data under `/data` inside the application 
 | --- | --- |
 | Container data directory | `/data` |
 | SQLite database | `/data/dashora.sqlite` |
-| Default Compose storage | Named volume `dashora-data` |
-| Runtime user | UID `10001` |
+| Recommended storage | Docker named volume |
+| Runtime user | `dashora` |
 
-To use a host bind mount:
+The default named volume is recommended because Docker manages its ownership and it avoids most SQLite permission problems.
+
+### Optional host bind mount
+
+When using a host directory, inspect the numeric UID and GID used by the published image:
+
+```bash
+docker run --rm \
+  --entrypoint sh \
+  ghcr.io/gittheums/dashora:1.0.1 \
+  -c 'printf "UID=%s\nGID=%s\n" "$(id -u)" "$(id -g)"'
+```
+
+Create the directory and use the exact values returned by that command:
 
 ```bash
 mkdir -p data
-sudo chown -R 10001:10001 data
+sudo chown -R ACTUAL_UID:ACTUAL_GID data
+sudo chmod 750 data
+```
 
+Test write access before starting Dashora:
+
+```bash
+docker run --rm \
+  -v "$PWD/data:/data" \
+  --entrypoint sh \
+  ghcr.io/gittheums/dashora:1.0.1 \
+  -c 'touch /data/write-test && rm /data/write-test && echo "Write access OK"'
+```
+
+Start with the bind mount through the supported Compose variable:
+
+```bash
 DASHORA_DATA_BIND=./data \
 docker compose -f compose.yaml -f compose.ghcr.yaml up -d
 ```
 
-Replacing or updating the container does not remove the database as long as the volume or bind-mounted data directory remains intact.
+Do not use `chmod 777`.
 
-> Deleting the persistent data directory permanently deletes dashboards, tasks, settings, and stored integration metadata.
+Replacing or updating the application container does not remove the database as long as the named volume or bind-mounted data directory remains intact.
+
+> [!CAUTION]
+> Deleting the persistent data volume or directory permanently deletes dashboards, tasks, settings, users, and stored integration metadata.
 
 ---
 
@@ -319,7 +469,7 @@ docker compose -f compose.yaml -f compose.ghcr.yaml ps
 Production installations should use a pinned image tag:
 
 ```yaml
-image: ghcr.io/gittheums/dashora:1.0.0
+image: ghcr.io/gittheums/dashora:1.0.1
 ```
 
 To roll back, change the tag to the previous known-good version and recreate the stack.
@@ -334,13 +484,120 @@ The included Compose stack serves Dashora through nginx on port `8080`.
 
 For remote access:
 
-- terminate TLS through nginx, Caddy, Traefik, or another trusted reverse proxy;
+- terminate TLS through nginx, Caddy, Traefik, Nginx Proxy Manager, or another trusted reverse proxy;
 - set the public origin and cookie settings correctly;
-- configure `TRUST_PROXY` only when forwarded headers are controlled by your proxy;
+- use `TRUST_PROXY=true` only when forwarded headers are controlled by a trusted proxy;
+- ensure the proxy strips client-supplied `X-Forwarded-*` headers;
+- use `TRUST_PROXY=false` when exposing the API directly without a trusted proxy;
 - never expose integration credentials in client-side configuration;
 - prefer a VPN or authenticated reverse proxy for private deployments.
 
 See [`docs/reverse-proxy.md`](docs/reverse-proxy.md).
+
+---
+
+## Troubleshooting
+
+### Browser shows JSON with `not_found`
+
+You opened the API port directly.
+
+Use:
+
+```text
+http://SERVER-IP:8080
+```
+
+Port `3000` is the API. Its root path does not serve the frontend.
+
+### Browser cannot connect to `localhost:5173`
+
+Port `5173` is the Vite development server and is not part of the production deployment.
+
+Use:
+
+```text
+http://SERVER-IP:8080
+```
+
+From another computer, use the Docker server's LAN IP or hostname—not `localhost`.
+
+### `dashora-assets` shows `Exited (0)`
+
+This is expected. The `assets` service copies the built frontend into a shared volume and then exits successfully.
+
+Inspect all services with:
+
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml ps -a
+```
+
+### `SqliteError: unable to open database file`
+
+Example:
+
+```text
+SqliteError: unable to open database file
+code: SQLITE_CANTOPEN
+```
+
+The `/data` directory is not writable by the `dashora` user.
+
+Recommended fixes:
+
+1. Use the default Docker named volume; or
+2. Inspect the image UID/GID and correct bind-mount ownership as described under [Persistent storage](#persistent-storage).
+
+Never solve this with `chmod 777`.
+
+### `services.dashora.environment must be a mapping`
+
+The Compose YAML contains invalid indentation or environment syntax.
+
+Validate before starting:
+
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml config
+```
+
+Correct mapping syntax:
+
+```yaml
+environment:
+  NODE_ENV: production
+  TZ: Europe/Amsterdam
+  DASHORA_DATA_DIR: /data
+```
+
+### Setup key is no longer visible
+
+The plaintext setup token is only logged when it is created. A normal restart does not reveal it again because Dashora stores only the token hash.
+
+See [Lost setup token on a brand-new installation](#lost-setup-token-on-a-brand-new-installation).
+
+### Check application health
+
+Through nginx:
+
+```bash
+curl -fsS http://localhost:8080/api/v1/health
+```
+
+Direct API check:
+
+```bash
+curl -fsS http://localhost:3000/api/v1/health
+```
+
+### Inspect logs
+
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml logs --tail=100 dashora
+docker compose -f compose.yaml -f compose.ghcr.yaml logs --tail=100 proxy
+docker compose -f compose.yaml -f compose.ghcr.yaml logs --tail=100 assets
+```
+
+More help: [`docs/troubleshooting.md`](docs/troubleshooting.md).
 
 ---
 
