@@ -2,6 +2,12 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# drizzle-kit@0.31.x still declares unused @esbuild-kit/esm-loader, which pins
+# esbuild ~0.18.20 (GHSA-67mh-4wv8-2f99). No stable drizzle-kit release drops it;
+# force a patched esbuild on that leaf only. Remove when drizzle-kit ships without @esbuild-kit/*.
+overrides:
+  "@esbuild-kit/core-utils>esbuild": ">=0.25.0"
+
 allowBuilds:
   "@biomejs/biome": true
   better-sqlite3: true
