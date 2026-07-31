@@ -62,6 +62,8 @@ export type BuildAppOptions = {
     | "LOGIN_RATE_LIMIT_WINDOW_MS"
     | "SETUP_RATE_LIMIT_MAX"
     | "SETUP_RATE_LIMIT_WINDOW_MS"
+    | "AUTH_ME_RATE_LIMIT_MAX"
+    | "AUTH_ME_RATE_LIMIT_WINDOW_MS"
     | "API_RATE_LIMIT_MAX"
     | "API_RATE_LIMIT_WINDOW_MS"
     | "HSTS_MAX_AGE_SECONDS"
@@ -193,9 +195,16 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     max: options.env.API_RATE_LIMIT_MAX,
     timeWindow: options.env.API_RATE_LIMIT_WINDOW_MS,
     hook: "preHandler",
-    errorResponseBuilder: () => ({
-      error: { code: "rate_limited", message: "Too many requests. Try again later." },
-    }),
+    // Thrown into the global error handler; must carry statusCode 429.
+    errorResponseBuilder: (_request, context) => {
+      const error = new Error("Too many requests. Try again later.") as Error & {
+        statusCode: number;
+        code: string;
+      };
+      error.statusCode = context.statusCode;
+      error.code = "rate_limited";
+      return error;
+    },
   });
 
   await registerHealthRoutes(app, { version: options.version });
@@ -291,6 +300,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     loginRateLimitWindowMs: options.env.LOGIN_RATE_LIMIT_WINDOW_MS,
     setupRateLimitMax: options.env.SETUP_RATE_LIMIT_MAX,
     setupRateLimitWindowMs: options.env.SETUP_RATE_LIMIT_WINDOW_MS,
+    authMeRateLimitMax: options.env.AUTH_ME_RATE_LIMIT_MAX,
+    authMeRateLimitWindowMs: options.env.AUTH_ME_RATE_LIMIT_WINDOW_MS,
     nodeEnv: options.env.NODE_ENV,
   });
 

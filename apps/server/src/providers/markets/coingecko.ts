@@ -9,8 +9,11 @@ import {
 import type { MarketRange } from "@dashora/widget-sdk/widgets/markets/server";
 import { type ProviderError, isProviderError } from "../errors.js";
 import type { ProviderPlatform } from "../platform.js";
+import { parseAllowedHttpsUrl } from "../url-allowlist.js";
 
 const COINGECKO_API_BASE = "https://api.coingecko.com/api/v3";
+const COINGECKO_PRO_HOSTNAME = "pro-api.coingecko.com";
+const COINGECKO_PUBLIC_HOSTNAMES = ["api.coingecko.com", COINGECKO_PRO_HOSTNAME] as const;
 
 type CoinGeckoSimplePriceResponse = Record<
   string,
@@ -64,15 +67,31 @@ function changeField(currency: string): string {
   return `${currencyField(currency)}_24h_change`;
 }
 
+function isCoinGeckoProHost(baseUrl: string): boolean {
+  const parsed = parseAllowedHttpsUrl(baseUrl, {
+    hostnames: COINGECKO_PUBLIC_HOSTNAMES,
+    rejectNonDefaultPort: true,
+  });
+  return parsed.ok && parsed.hostname === COINGECKO_PRO_HOSTNAME;
+}
+
 function apiHeaders(apiKey: string | null, baseUrl: string): Record<string, string> {
   if (!apiKey) {
     return {};
   }
   // Pro hosts use x-cg-pro-api-key; Demo/public hosts use x-cg-demo-api-key.
-  if (baseUrl.includes("pro-api.coingecko.com")) {
+  // Hostname is compared via WHATWG URL parsing — never substring-match the full URL.
+  if (isCoinGeckoProHost(baseUrl)) {
     return { "x-cg-pro-api-key": apiKey };
   }
   return { "x-cg-demo-api-key": apiKey };
+}
+
+/** Exported for unit tests — validates CoinGecko base URLs before key header selection. */
+export function resolveCoinGeckoApiKeyHeaderName(
+  baseUrl: string,
+): "x-cg-pro-api-key" | "x-cg-demo-api-key" {
+  return isCoinGeckoProHost(baseUrl) ? "x-cg-pro-api-key" : "x-cg-demo-api-key";
 }
 
 function mapCoinGeckoError(error: ProviderError): MarketsAdapterError {

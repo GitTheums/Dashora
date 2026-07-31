@@ -54,6 +54,8 @@ describe("parseServerEnv", () => {
     expect(env.COOKIE_SECURE).toBe(true);
     expect(env.SESSION_TTL_MS).toBe(3_600_000);
     expect(env.LOGIN_RATE_LIMIT_MAX).toBe(5);
+    expect(env.AUTH_ME_RATE_LIMIT_MAX).toBe(60);
+    expect(env.AUTH_ME_RATE_LIMIT_WINDOW_MS).toBe(60_000);
   });
 
   it("parses provider HTTP defaults", () => {

@@ -6,6 +6,8 @@ import {
   CUSTOM_API_DEFAULT_CONFIG,
   type CustomApiConfig,
   customApiConfigSchema,
+  isValidJsonPath,
+  jsonPathSchema,
 } from "./config.js";
 import { customApiDefinition } from "./definition.js";
 import { parseJsonPath, readJsonPath } from "./json-path.js";
@@ -73,6 +75,35 @@ describe("json path", () => {
   it("rejects unsafe path forms", () => {
     expect(parseJsonPath("a..b")).toBeNull();
     expect(parseJsonPath("a[?(@.x)]")).toBeNull();
+  });
+
+  it("accepts normal limited paths via schema validation", () => {
+    expect(jsonPathSchema.parse("$.items[0].title")).toBe("$.items[0].title");
+    expect(jsonPathSchema.parse("data.value")).toBe("data.value");
+    expect(jsonPathSchema.parse("[0].title")).toBe("[0].title");
+    expect(isValidJsonPath("a.b_c[12]")).toBe(true);
+  });
+
+  it("rejects invalid, recursive, and boundary-length paths", () => {
+    expect(() => jsonPathSchema.parse("")).toThrow();
+    expect(() => jsonPathSchema.parse("$")).toThrow();
+    expect(() => jsonPathSchema.parse("a..b")).toThrow();
+    expect(() => jsonPathSchema.parse("a[?(@.x)]")).toThrow();
+    expect(() => jsonPathSchema.parse("items[")).toThrow();
+    expect(() => jsonPathSchema.parse("items[]")).toThrow();
+    expect(() => jsonPathSchema.parse(".[0]")).toThrow();
+    expect(jsonPathSchema.parse(".hidden")).toBe(".hidden");
+    expect(isValidJsonPath(`a.${"b".repeat(200)}`)).toBe(false);
+    expect(isValidJsonPath("a")).toBe(true);
+    expect(isValidJsonPath(`a.${"b".repeat(198)}`)).toBe(true);
+  });
+
+  it("rejects adversarial long input quickly", () => {
+    const adversarial = `${"a[".repeat(80)}${"1".repeat(80)}${"]".repeat(40)}.${"x".repeat(40)}`;
+    const started = performance.now();
+    expect(isValidJsonPath(adversarial)).toBe(false);
+    expect(() => jsonPathSchema.safeParse(adversarial)).not.toThrow();
+    expect(performance.now() - started).toBeLessThan(50);
   });
 });
 

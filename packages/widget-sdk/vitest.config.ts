@@ -15,7 +15,8 @@ export default defineConfig({
         "src/definition.ts",
         "src/registry/**/*.{ts,tsx}",
       ],
-      exclude: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      // types.ts is type-only (erased at emit); it has no runtime values/functions to cover.
+      exclude: ["src/**/*.test.ts", "src/**/*.test.tsx", "src/registry/types.ts"],
       thresholds: {
         lines: 65,
         functions: 65,

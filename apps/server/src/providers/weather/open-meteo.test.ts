@@ -1,13 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { createTestServerEnv } from "../../test/env.js";
 import { createProviderPlatform } from "../platform.js";
+import { isAllowedHttpsHostname } from "../url-allowlist.js";
 import { createOpenMeteoWeatherAdapter } from "./open-meteo.js";
+
+const GEOCODING_HOST = "geocoding-api.open-meteo.com";
+const FORECAST_HOST = "api.open-meteo.com";
+
+function matchesOpenMeteoHost(input: string | URL | Request, hostname: string): boolean {
+  const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  return isAllowedHttpsHostname(raw, [hostname]);
+}
 
 describe("Open-Meteo weather adapter", () => {
   it("searches locations and fetches a forecast", async () => {
     const fetchImpl: typeof fetch = async (input) => {
-      const url = String(input);
-      if (url.includes("geocoding-api.open-meteo.com")) {
+      if (matchesOpenMeteoHost(input, GEOCODING_HOST)) {
         return new Response(
           JSON.stringify({
             results: [
@@ -25,7 +33,7 @@ describe("Open-Meteo weather adapter", () => {
           { status: 200, headers: { "content-type": "application/json" } },
         );
       }
-      if (url.includes("api.open-meteo.com")) {
+      if (matchesOpenMeteoHost(input, FORECAST_HOST)) {
         return new Response(
           JSON.stringify({
             timezone: "Europe/Amsterdam",
@@ -87,5 +95,29 @@ describe("Open-Meteo weather adapter", () => {
     expect(forecast.forecast.hourly).toHaveLength(1);
     expect(forecast.forecast.daily).toHaveLength(1);
     expect(forecast.forecast.providerId).toBe("open-meteo");
+  });
+
+  it("matches only exact Open-Meteo hostnames in mock routing", () => {
+    expect(matchesOpenMeteoHost("https://api.open-meteo.com/v1/forecast", FORECAST_HOST)).toBe(
+      true,
+    );
+    expect(
+      matchesOpenMeteoHost("https://API.OPEN-METEO.COM/v1/forecast?lat=1", FORECAST_HOST),
+    ).toBe(true);
+    expect(
+      matchesOpenMeteoHost(
+        "https://api.open-meteo.com.attacker.example/v1/forecast",
+        FORECAST_HOST,
+      ),
+    ).toBe(false);
+    expect(
+      matchesOpenMeteoHost("https://attacker-api.open-meteo.com/v1/forecast", FORECAST_HOST),
+    ).toBe(false);
+    expect(
+      matchesOpenMeteoHost("https://user:pass@api.open-meteo.com/v1/forecast", FORECAST_HOST),
+    ).toBe(false);
+    expect(matchesOpenMeteoHost("http://api.open-meteo.com/v1/forecast", FORECAST_HOST)).toBe(
+      false,
+    );
   });
 });

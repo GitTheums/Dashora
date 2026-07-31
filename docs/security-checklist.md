@@ -26,8 +26,9 @@ Status legend: ✅ Done · ⚠️ Partial (see note) · ➖ Not applicable / out
 | 11 | Session token rotation during a long-lived session (not just expiry extension) | ✅ | `auth/session-service.ts` | `auth/session-service.test.ts` |
 | 12 | Password hashing with a slow, salted algorithm (Argon2id) + constant-time comparison on unknown accounts | ✅ (pre-existing) | `auth/password.ts` | `auth/password.test.ts` |
 | 13 | Password policy beyond length (denylist, no email-based passwords) | ✅ | `packages/shared/src/auth.ts`, `password-denylist.ts` | `auth.test.ts`, `password-denylist.test.ts`, `routes/auth.test.ts` |
-| 14 | Login brute-force rate limiting | ✅ (pre-existing) | `routes/auth.ts` | `routes/auth.test.ts` |
-| 15 | First-run setup token brute-force rate limiting | ✅ | `routes/auth.ts` | (rate-limit registration; covered by existing setup-completion tests exercising the scope) |
+| 14 | Login brute-force rate limiting | ✅ | `routes/auth.ts` (`config.rateLimit`) | `routes/auth-rate-limit.test.ts` |
+| 15 | First-run setup token brute-force rate limiting | ✅ | `routes/auth.ts` (`config.rateLimit`) | `routes/auth-rate-limit.test.ts` |
+| 15b | Session probe (`/api/v1/auth/me`) rate limiting | ✅ | `routes/auth.ts` (`config.rateLimit`) | `routes/auth-rate-limit.test.ts` |
 | 16 | Global API rate limiting (abuse/DoS backstop) | ✅ | `app.ts` | (registered globally; see `http/error-handler.test.ts` 429 handling) |
 | 17 | Self-service session revocation ("sign out of all devices") | ⚠️ Partial | Logout deletes only the current session row | Not implemented — see SECURITY.md |
 | 18 | Password reset / change flow | ➖ | Not implemented | Out of scope for this pass — see SECURITY.md |

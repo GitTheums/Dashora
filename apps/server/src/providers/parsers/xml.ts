@@ -53,13 +53,51 @@ export function parseXml(input: string): XmlNode {
     return value;
   }
 
+  /**
+   * Decode predefined XML entities (and numeric character references) exactly once.
+   * A single left-to-right pass avoids chained `.replace` unescaping, which CodeQL
+   * flags as double-unescaping when `&amp;` interacts with later entity rewrites.
+   */
   function decodeEntities(value: string): string {
-    return value
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&amp;/g, "&")
-      .replace(/&quot;/g, '"')
-      .replace(/&apos;/g, "'");
+    return value.replace(
+      /&(#(?:x[0-9A-Fa-f]+|\d+)|lt|gt|amp|quot|apos);/g,
+      (entity, name: string) => {
+        switch (name) {
+          case "lt":
+            return "<";
+          case "gt":
+            return ">";
+          case "amp":
+            return "&";
+          case "quot":
+            return '"';
+          case "apos":
+            return "'";
+          default: {
+            if (!name.startsWith("#")) {
+              return entity;
+            }
+            const raw = name.slice(1);
+            const codePoint =
+              raw.startsWith("x") || raw.startsWith("X")
+                ? Number.parseInt(raw.slice(1), 16)
+                : Number.parseInt(raw, 10);
+            if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
+              return entity;
+            }
+            // Keep control characters (except TAB/LF/CR) out of feed text.
+            if (codePoint < 0x20 && codePoint !== 0x9 && codePoint !== 0xa && codePoint !== 0xd) {
+              return "";
+            }
+            try {
+              return String.fromCodePoint(codePoint);
+            } catch {
+              return entity;
+            }
+          }
+        }
+      },
+    );
   }
 
   function parseName(): string {

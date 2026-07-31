@@ -36,15 +36,16 @@ Tests: [`security-headers.test.ts`](../apps/server/src/http/security-headers.tes
 
 ## Rate limiting
 
-Three independent limiters, all via `@fastify/rate-limit`:
+Four limiters via `@fastify/rate-limit` (global plugin + per-route `config.rateLimit` overrides):
 
-| Scope | Env vars | Default | Purpose |
-| --- | --- | --- | --- |
-| Global (every route) | `API_RATE_LIMIT_MAX` / `API_RATE_LIMIT_WINDOW_MS` | 300 / 60s | General abuse/DoS backstop. |
-| Login (`POST /api/v1/auth/login`) | `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW_MS` | 10 / 15min | Credential-stuffing / brute-force resistance. |
-| Setup completion (`POST /api/v1/setup/complete`) | `SETUP_RATE_LIMIT_MAX` / `SETUP_RATE_LIMIT_WINDOW_MS` | 20 / 15min | The one-time setup token is a bearer secret; this slows down guessing it. |
+| Scope | Env vars | Default | Key | Purpose |
+| --- | --- | --- | --- | --- |
+| Global (every route) | `API_RATE_LIMIT_MAX` / `API_RATE_LIMIT_WINDOW_MS` | 300 / 60s | Client IP | General abuse/DoS backstop. |
+| Login (`POST /api/v1/auth/login`) | `LOGIN_RATE_LIMIT_MAX` / `LOGIN_RATE_LIMIT_WINDOW_MS` | 10 / 15min | Client IP + normalized email | Credential-stuffing / brute-force resistance. |
+| Setup completion (`POST /api/v1/setup/complete`) | `SETUP_RATE_LIMIT_MAX` / `SETUP_RATE_LIMIT_WINDOW_MS` | 20 / 15min | Client IP + normalized email | The one-time setup token is a bearer secret; this slows down guessing it. |
+| Session probe (`GET /api/v1/auth/me`) | `AUTH_ME_RATE_LIMIT_MAX` / `AUTH_ME_RATE_LIMIT_WINDOW_MS` | 60 / 60s | Client IP | Slows session-cookie probing. |
 
-All three return a generic `429 rate_limited` body with no internal details.
+All auth limiters return a generic `429 rate_limited` body (no account-existence hints) and a `Retry-After` header. Client IP is taken from Fastify's `request.ip`; `X-Forwarded-For` is trusted only when `TRUST_PROXY` is enabled behind a stripping reverse proxy.
 
 ## Authentication model
 

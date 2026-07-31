@@ -28,8 +28,17 @@ export function registerErrorHandler(app: FastifyInstance): void {
       });
     }
     if (statusCode === 429) {
+      // Prefer the rate-limiter's safe generic message when present; never forward stacks.
+      const rateLimited =
+        error.code === "rate_limited" &&
+        typeof error.message === "string" &&
+        error.message.length > 0 &&
+        error.message.length <= 200;
       return reply.status(429).send({
-        error: { code: "rate_limited", message: "Too many requests. Try again later." },
+        error: {
+          code: "rate_limited",
+          message: rateLimited ? error.message : "Too many requests. Try again later.",
+        },
       });
     }
     if (statusCode >= 400 && statusCode < 500) {

@@ -12,17 +12,93 @@ function isValidRequestUrl(value: string): boolean {
   }
 }
 
+const JSON_PATH_MAX_LENGTH = 200;
+
+/**
+ * Deterministic validator for limited JSON paths (`$.a.b[0].c` / `a.b[0].c`).
+ * Avoids nested ambiguous quantifiers that can backtrack super-linearly on long invalid input.
+ */
+export function isValidJsonPath(value: string): boolean {
+  if (value.length === 0 || value.length > JSON_PATH_MAX_LENGTH) {
+    return false;
+  }
+  if (value.includes("..")) {
+    return false;
+  }
+
+  let index = 0;
+  if (value.startsWith("$")) {
+    index = 1;
+  }
+  if (index >= value.length) {
+    return false;
+  }
+
+  let sawSegment = false;
+  while (index < value.length) {
+    const char = value[index];
+    if (char === ".") {
+      index += 1;
+      if (index >= value.length || !isJsonPathIdentStart(value[index] ?? "")) {
+        return false;
+      }
+      index = readJsonPathIdent(value, index);
+      sawSegment = true;
+      continue;
+    }
+    if (char === "[") {
+      index += 1;
+      if (index >= value.length || !isDigit(value[index] ?? "")) {
+        return false;
+      }
+      while (index < value.length && isDigit(value[index] ?? "")) {
+        index += 1;
+      }
+      if (value[index] !== "]") {
+        return false;
+      }
+      index += 1;
+      sawSegment = true;
+      continue;
+    }
+    if (!sawSegment && isJsonPathIdentStart(char ?? "")) {
+      index = readJsonPathIdent(value, index);
+      sawSegment = true;
+      continue;
+    }
+    return false;
+  }
+
+  return sawSegment;
+}
+
+function isJsonPathIdentStart(char: string): boolean {
+  return (char >= "A" && char <= "Z") || (char >= "a" && char <= "z") || char === "_";
+}
+
+function isJsonPathIdentPart(char: string): boolean {
+  return isJsonPathIdentStart(char) || isDigit(char);
+}
+
+function isDigit(char: string): boolean {
+  return char >= "0" && char <= "9";
+}
+
+function readJsonPathIdent(value: string, start: number): number {
+  let index = start + 1;
+  while (index < value.length && isJsonPathIdentPart(value[index] ?? "")) {
+    index += 1;
+  }
+  return index;
+}
+
 /** Limited JSON path: `$.a.b[0].c` or `a.b[0].c` — no filters, scripts, or recursive descent. */
 export const jsonPathSchema = z
   .string()
   .trim()
   .min(1)
-  .max(200)
-  .regex(
-    /^\$?(?:\.?[A-Za-z_][A-Za-z0-9_]*|\[\d+\])+$/,
-    "Use a simple path such as data.value or items[0].title",
-  )
-  .refine((value) => !value.includes(".."), "Recursive descent (..) is not allowed");
+  .max(JSON_PATH_MAX_LENGTH)
+  .refine(isValidJsonPath, "Use a simple path such as data.value or items[0].title");
 
 export const customApiMethodSchema = z.enum(["GET", "POST"]);
 export type CustomApiMethod = z.infer<typeof customApiMethodSchema>;

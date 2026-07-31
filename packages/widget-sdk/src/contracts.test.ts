@@ -76,4 +76,24 @@ describe("defineWidget", () => {
       }),
     ).toThrow(/missing required states/);
   });
+
+  it("rejects migrateConfig.currentVersion mismatches", () => {
+    expect(() =>
+      defineWidget({
+        id: "mismatch",
+        name: "Mismatch",
+        version: "0.0.1",
+        schemaVersion: 2,
+        description: "Migration version mismatch on purpose.",
+        category: "other",
+        icon: { name: "x" },
+        configSchema: z.object({ title: z.string().default("x") }),
+        defaultConfig: { title: "x" },
+        migrateConfig: {
+          currentVersion: 1,
+          steps: [],
+        },
+      }),
+    ).toThrow(/migrateConfig.currentVersion/);
+  });
 });

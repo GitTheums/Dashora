@@ -9,7 +9,7 @@ import {
   setupResponseSchema,
   setupStatusResponseSchema,
 } from "@dashora/shared";
-import rateLimit from "@fastify/rate-limit";
+import type { RateLimitOptions } from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { CSRF_COOKIE_NAME, SESSION_COOKIE_NAME } from "../auth/cookies.js";
 import { isStateChangingMethod, sendCsrfError, validateCsrf } from "../auth/csrf.js";
@@ -37,6 +37,8 @@ export type AuthRouteOptions = {
   loginRateLimitWindowMs: number;
   setupRateLimitMax: number;
   setupRateLimitWindowMs: number;
+  authMeRateLimitMax: number;
+  authMeRateLimitWindowMs: number;
   nodeEnv: "development" | "test" | "production";
 };
 
@@ -93,6 +95,60 @@ function logSetupDiagnostics(
   app.log.info(payload, message);
 }
 
+function normalizeEmailKey(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function readBodyEmail(request: FastifyRequest): string | null {
+  const body = request.body;
+  if (body === null || typeof body !== "object" || !("email" in body)) {
+    return null;
+  }
+  return normalizeEmailKey((body as { email?: unknown }).email);
+}
+
+/**
+ * Build a route-level `@fastify/rate-limit` override.
+ * Applied via `config.rateLimit` on each sensitive auth route so CodeQL and reviewers
+ * can see the limiter attached directly to the handler (inherits the global plugin).
+ * Client IP comes from Fastify (`request.ip`); `X-Forwarded-For` is only trusted when
+ * `TRUST_PROXY` is enabled behind a stripping reverse proxy — see docs/security-model.md.
+ */
+function authRouteRateLimit(options: {
+  max: number;
+  timeWindowMs: number;
+  message: string;
+  /** When true, include a normalized email from the JSON body in the rate-limit key. */
+  includeEmail?: boolean;
+}): RateLimitOptions {
+  return {
+    max: options.max,
+    timeWindow: options.timeWindowMs,
+    hook: "preHandler",
+    keyGenerator: (request) => {
+      const ip = request.ip || "unknown";
+      if (!options.includeEmail) {
+        return `auth:${ip}`;
+      }
+      const email = readBodyEmail(request);
+      return email ? `auth:${ip}:${email}` : `auth:${ip}`;
+    },
+    // Must return an Error with statusCode — @fastify/rate-limit throws this into the
+    // global error handler, which maps 429 + code=rate_limited to a safe JSON envelope.
+    // The plugin also sets the Retry-After response header before throwing.
+    errorResponseBuilder: (_request, context) => {
+      const error = new Error(options.message) as Error & { statusCode: number; code: string };
+      error.statusCode = context.statusCode;
+      error.code = "rate_limited";
+      return error;
+    },
+  };
+}
+
 export async function registerAuthRoutes(
   app: FastifyInstance,
   options: AuthRouteOptions,
@@ -117,30 +173,41 @@ export async function registerAuthRoutes(
     return authCsrfResponseSchema.parse({ csrfToken });
   });
 
-  app.get("/api/v1/auth/me", async (request, reply) => {
-    const auth = await sessions.resolveSession(request, reply);
-    if (!auth) {
-      return sendApiError(reply, 401, "unauthenticated", "Authentication required");
-    }
-    return authMeResponseSchema.parse({
-      user: toAuthUser(auth.user),
-    });
-  });
+  app.get(
+    "/api/v1/auth/me",
+    {
+      config: {
+        rateLimit: authRouteRateLimit({
+          max: options.authMeRateLimitMax,
+          timeWindowMs: options.authMeRateLimitWindowMs,
+          message: "Too many session checks. Try again later.",
+        }),
+      },
+    },
+    async (request, reply) => {
+      const auth = await sessions.resolveSession(request, reply);
+      if (!auth) {
+        return sendApiError(reply, 401, "unauthenticated", "Authentication required");
+      }
+      return authMeResponseSchema.parse({
+        user: toAuthUser(auth.user),
+      });
+    },
+  );
 
-  await app.register(async (loginScope) => {
-    await loginScope.register(rateLimit, {
-      max: options.loginRateLimitMax,
-      timeWindow: options.loginRateLimitWindowMs,
-      hook: "preHandler",
-      errorResponseBuilder: () => ({
-        error: {
-          code: "rate_limited",
+  app.post(
+    "/api/v1/auth/login",
+    {
+      config: {
+        rateLimit: authRouteRateLimit({
+          max: options.loginRateLimitMax,
+          timeWindowMs: options.loginRateLimitWindowMs,
           message: "Too many login attempts. Try again later.",
-        },
-      }),
-    });
-
-    loginScope.post("/api/v1/auth/login", async (request, reply) => {
+          includeEmail: true,
+        }),
+      },
+    },
+    async (request, reply) => {
       if (!(await requireCsrf(request, reply))) {
         return;
       }
@@ -177,8 +244,8 @@ export async function registerAuthRoutes(
       return loginResponseSchema.parse({
         user: toAuthUser(user),
       });
-    });
-  });
+    },
+  );
 
   app.post("/api/v1/auth/logout", async (request, reply) => {
     if (!(await requireCsrf(request, reply))) {
@@ -211,20 +278,19 @@ export async function registerAuthRoutes(
     return logoutResponseSchema.parse({ ok: true });
   });
 
-  await app.register(async (setupScope) => {
-    await setupScope.register(rateLimit, {
-      max: options.setupRateLimitMax,
-      timeWindow: options.setupRateLimitWindowMs,
-      hook: "preHandler",
-      errorResponseBuilder: () => ({
-        error: {
-          code: "rate_limited",
+  app.post(
+    SETUP_COMPLETE_PATH,
+    {
+      config: {
+        rateLimit: authRouteRateLimit({
+          max: options.setupRateLimitMax,
+          timeWindowMs: options.setupRateLimitWindowMs,
           message: "Too many setup attempts. Try again later.",
-        },
-      }),
-    });
-
-    setupScope.post(SETUP_COMPLETE_PATH, async (request, reply) => {
+          includeEmail: true,
+        }),
+      },
+    },
+    async (request, reply) => {
       logSetupDiagnostics(
         app,
         options.nodeEnv,
@@ -316,6 +382,6 @@ export async function registerAuthRoutes(
       return setupResponseSchema.parse({
         user: toAuthUser(result.user),
       });
-    });
-  });
+    },
+  );
 }

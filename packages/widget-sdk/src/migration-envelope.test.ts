@@ -52,25 +52,79 @@ describe("migrateWidgetConfig", () => {
         return { title: legacy.name ?? "Untitled" };
       },
     },
+    {
+      fromVersion: 2,
+      toVersion: 3,
+      migrate: (config: unknown) => {
+        const current = config as { title?: string };
+        return { title: current.title ?? "Untitled", enabled: true };
+      },
+    },
   ];
 
   it("returns config unchanged when versions match", () => {
     expect(migrateWidgetConfig({ a: 1 }, 2, 2, steps)).toEqual({ a: 1 });
   });
 
-  it("applies ordered steps", () => {
+  it("applies ordered steps across multiple versions", () => {
     expect(migrateWidgetConfig({ name: "Alpha" }, 1, 2, steps)).toEqual({
       title: "Alpha",
     });
+    expect(migrateWidgetConfig({ name: "Alpha" }, 1, 3, steps)).toEqual({
+      title: "Alpha",
+      enabled: true,
+    });
+  });
+
+  it("throws when migrating downward", () => {
+    expect(() => migrateWidgetConfig({}, 3, 1, steps)).toThrow(WidgetConfigMigrationError);
+    try {
+      migrateWidgetConfig({}, 3, 1, steps);
+    } catch (error) {
+      expect(error).toMatchObject({
+        name: "WidgetConfigMigrationError",
+        fromVersion: 3,
+        toVersion: 1,
+      });
+    }
   });
 
   it("throws when a step is missing", () => {
-    expect(() => migrateWidgetConfig({}, 1, 3, steps)).toThrow(WidgetConfigMigrationError);
+    expect(() => migrateWidgetConfig({}, 1, 4, steps)).toThrow(/Missing migration step/);
+  });
+
+  it("throws when a step does not advance the version", () => {
+    expect(() =>
+      migrateWidgetConfig({}, 1, 2, [
+        { fromVersion: 1, toVersion: 1, migrate: (config) => config },
+      ]),
+    ).toThrow(/Invalid migration step/);
+  });
+
+  it("throws when a step overshoots the target version", () => {
+    expect(() =>
+      migrateWidgetConfig({}, 1, 2, [
+        { fromVersion: 1, toVersion: 3, migrate: (config) => config },
+      ]),
+    ).toThrow(/overshoots target/);
   });
 
   it("parseMigratedConfig validates after migration", () => {
     const schema = z.object({ title: z.string().min(1) });
-    const parsed = parseMigratedConfig(schema, { name: "Beta" }, 1, { currentVersion: 2, steps });
+    const parsed = parseMigratedConfig(schema, { name: "Beta" }, 1, {
+      currentVersion: 2,
+      steps: steps.slice(0, 1),
+    });
     expect(parsed).toEqual({ title: "Beta" });
+  });
+
+  it("parseMigratedConfig rejects invalid migrated config", () => {
+    const schema = z.object({ title: z.string().min(1) });
+    expect(() =>
+      parseMigratedConfig(schema, { name: "" }, 1, {
+        currentVersion: 2,
+        steps: steps.slice(0, 1),
+      }),
+    ).toThrow();
   });
 });

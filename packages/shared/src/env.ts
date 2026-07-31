@@ -75,6 +75,10 @@ export function createServerEnvSchema(defaults: { version: string }) {
       .int()
       .positive()
       .default(15 * 60 * 1000),
+    /** Max `/api/v1/auth/me` session probes per IP within the rate-limit window. */
+    AUTH_ME_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(60),
+    /** Auth `/me` rate-limit window in milliseconds. Default 1 minute. */
+    AUTH_ME_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     /** General API rate-limit max requests per window (abuse/DoS backstop). */
     API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
     /** General API rate-limit window in milliseconds. Default 1 minute. */

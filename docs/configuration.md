@@ -52,10 +52,12 @@ Compose convenience variable (not read by the Node process directly):
 | Variable | Default | Description |
 | --- | --- | --- |
 | `SETUP_TOKEN_TTL_MS` | `86400000` (24h) | First-run setup token lifetime |
-| `SETUP_RATE_LIMIT_MAX` | `20` | Max setup-complete attempts per window |
-| `SETUP_RATE_LIMIT_WINDOW_MS` | `900000` (15m) | Setup rate-limit window |
-| `LOGIN_RATE_LIMIT_MAX` | `10` | Max login attempts per window |
+| `LOGIN_RATE_LIMIT_MAX` | `10` | Max login attempts per window (keyed by client IP + normalized email) |
 | `LOGIN_RATE_LIMIT_WINDOW_MS` | `900000` (15m) | Login rate-limit window |
+| `SETUP_RATE_LIMIT_MAX` | `20` | Max setup-complete attempts per window (keyed by client IP + normalized email) |
+| `SETUP_RATE_LIMIT_WINDOW_MS` | `900000` (15m) | Setup rate-limit window |
+| `AUTH_ME_RATE_LIMIT_MAX` | `60` | Max `/api/v1/auth/me` session probes per window (keyed by client IP) |
+| `AUTH_ME_RATE_LIMIT_WINDOW_MS` | `60000` (1m) | Auth `/me` rate-limit window |
 | `API_RATE_LIMIT_MAX` | `300` | Global API requests per window |
 | `API_RATE_LIMIT_WINDOW_MS` | `60000` (1m) | Global API rate-limit window |
 | `MAX_BODY_BYTES` | `1000000` | Default Fastify body size limit |
