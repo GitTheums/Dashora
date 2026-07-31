@@ -1,265 +1,525 @@
-# Dashora
+<p align="center">
+  <img src="docs/images/dashora-banner.png" alt="Dashora — your home, your data, your way" width="100%">
+</p>
 
-**A self-hosted personal dashboard for the information you check every day.**
+<p align="center">
+  <strong>A modern, self-hosted personal dashboard for everything you want to see at a glance.</strong>
+</p>
 
-Dashora puts feeds, weather, calendars, bookmarks, markets, and other first-party widgets on a calm, responsive grid that you own and run on your own hardware. Secrets stay on the server. Your data stays local.
+<p align="center">
+  Build your own pages, arrange widgets with drag and drop, and keep your data on infrastructure you control.
+</p>
 
-> **Inspiration, not a fork.** Dashora is an independent product and codebase. [Glance](https://github.com/glanceapp/glance) inspired the *category* of a self-hosted personal dashboard; Dashora does not copy Glance source, templates, assets, naming, CSS, or documentation.
+<p align="center">
+  <a href="https://github.com/GitTheums/Dashora/releases">
+    <img src="https://img.shields.io/github/v/release/GitTheums/Dashora?display_name=tag&sort=semver&style=flat-square&color=2dd4bf" alt="Latest release">
+  </a>
+  <a href="https://github.com/GitTheums/Dashora/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/GitTheums/Dashora/ci.yml?branch=main&style=flat-square&label=build" alt="Build status">
+  </a>
+  <a href="https://github.com/GitTheums/Dashora/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/GitTheums/Dashora?style=flat-square" alt="License">
+  </a>
+  <img src="https://img.shields.io/badge/Docker-amd64%20%7C%20arm64-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker platforms">
+  <img src="https://img.shields.io/badge/self--hosted-yes-2dd4bf?style=flat-square" alt="Self-hosted">
+</p>
+
+<p align="center">
+  <a href="#what-is-dashora">Overview</a>
+  ·
+  <a href="#features">Features</a>
+  ·
+  <a href="#widgets">Widgets</a>
+  ·
+  <a href="#quick-start">Quick start</a>
+  ·
+  <a href="#documentation">Documentation</a>
+  ·
+  <a href="#development">Development</a>
+</p>
 
 ---
 
-## Screenshots
+## What is Dashora?
 
-<!-- Replace these placeholders with real captures when ready. -->
+Dashora is a self-hosted personal information dashboard. It brings the things you check throughout the day—weather, feeds, calendars, markets, GitHub activity, bookmarks, tasks, media, and more—together in one calm, responsive interface.
 
-| Light | Dark |
+Create multiple pages, add only the widgets you need, and arrange each dashboard through a visual drag-and-drop editor. Dashora runs on your own hardware, stores its persistent data in SQLite, and keeps provider credentials on the server.
+
+> **Dashora is an information hub, not an infrastructure management platform.**  
+> For detailed Proxmox, VM, LXC, Docker, and homelab management, see the separate Rackora project.
+
+### Built around four principles
+
+| Principle | What it means |
 | --- | --- |
-| ![Dashora dashboard — light theme (placeholder)](docs/images/dashboard-light.placeholder.svg) | ![Dashora dashboard — dark theme (placeholder)](docs/images/dashboard-dark.placeholder.svg) |
-
-| Mobile | Edit mode |
-| --- | --- |
-| ![Dashora dashboard — mobile (placeholder)](docs/images/dashboard-mobile.placeholder.svg) | ![Dashora layout editor (placeholder)](docs/images/dashboard-edit.placeholder.svg) |
+| **Personal** | Your pages, widgets, layout, theme, branding, and data sources |
+| **Glanceable** | Important information should be understandable within seconds |
+| **Local-first** | Persistent data stays on your own server by default |
+| **Resilient** | One unavailable feed or provider should never break the whole dashboard |
 
 ---
 
-## Key features
+## Features
 
-- **Personal home screen** — Multiple pages, a 12-column responsive layout, and edit mode for arranging widgets.
-- **First-party widgets** — Search, clock, bookmarks, todo, weather, RSS, calendar, GitHub, markets, news feeds, YouTube, Twitch, Custom API, and sandboxed iFrame embeds.
-- **Server-side secrets** — Integration tokens are encrypted at rest and never sent to the browser.
-- **Stale-while-revalidate** — Prefer last-good data with a clear stale signal over a blank failure while refresh continues.
-- **Local session auth** — Argon2id passwords, HttpOnly cookies, CSRF protection, and rate limits on login and first-run setup.
-- **Light and dark themes** — Appearance settings with practical WCAG AA contrast, keyboard navigation, and reduced-motion respect.
-- **Config backup / restore** — Export and import dashboard configuration from Settings (plus full SQLite volume backups for disaster recovery).
-- **Docker-first deploy** — Production Compose stack with nginx, a persistent `/data` volume, and multi-arch image builds (`linux/amd64`, `linux/arm64`).
+| Area | What Dashora provides |
+| --- | --- |
+| **Dashboard pages** | Create, rename, reorder, duplicate, and remove multiple pages |
+| **Visual editor** | Drag, resize, undo, and persist widget layouts |
+| **Responsive layouts** | Independent desktop, tablet, and mobile arrangements |
+| **Widget catalog** | Searchable first-party widget library with settings and previews |
+| **Appearance** | Light, dark, and system mode with multiple polished presets |
+| **Personalization** | Accent colors, density, card radius, ambient background, custom name, and logo |
+| **Local authentication** | Secure first-run setup, Argon2id passwords, server-side sessions, and rate limiting |
+| **Server-side integrations** | Provider tokens and credentials never need to enter the browser bundle |
+| **Reliable refreshes** | Independent widget loading, caching, stale states, and manual refresh |
+| **Backup and restore** | Versioned configuration export/import plus full SQLite volume backups |
+| **Docker-first deployment** | Multi-stage image, healthcheck, non-root runtime, and persistent `/data` storage |
+| **Multi-architecture images** | Published for `linux/amd64` and `linux/arm64` |
+
+---
+
+## Widgets
+
+Dashora ships with first-party widgets maintained inside this repository. There is no remote JavaScript plugin marketplace or runtime plugin CDN.
+
+### Utilities and productivity
+
+| Widget | Description |
+| --- | --- |
+| **Search** | Configurable search engines, keyboard shortcut, and quick links |
+| **Clock** | Local time, secondary timezone, date format, and 12/24-hour display |
+| **Bookmarks** | Grouped links with custom labels and visual organization |
+| **Todo** | Persistent tasks with completion, reordering, and optional due dates |
+
+### Information and feeds
+
+| Widget | Description |
+| --- | --- |
+| **Weather** | Current conditions and forecasts through Open-Meteo |
+| **RSS** | Multiple RSS and Atom feeds with feed-level failure isolation |
+| **Calendar** | Privacy-conscious ICS/iCal agenda with optional basic authentication |
+| **Hacker News** | Top, new, best, Ask, Show, and Jobs feeds |
+| **Lobsters** | Hottest, newest, active, and tag-based stories |
+| **Reddit** | Subreddit listings through Reddit OAuth |
+| **YouTube** | Channel uploads through Atom feeds |
+| **Twitch** | Live status for configured Twitch channels |
+
+### Development and markets
+
+| Widget | Description |
+| --- | --- |
+| **GitHub Repository** | Stars, forks, issues, pull requests, and repository activity |
+| **GitHub Releases** | Latest releases for one or more repositories |
+| **Markets** | Crypto, equity, and index watchlists through provider adapters |
+| **Custom API** | Server-side JSON requests mapped into a restricted presentation model |
+| **iFrame** | Sandboxed HTTPS embeds with optional host allowlisting |
+
+See the complete catalog in [`docs/widgets/index.md`](docs/widgets/index.md).
 
 ---
 
 ## Dashora versus Rackora
 
-Dashora and Rackora are sibling products with different jobs.
+Dashora and Rackora are related by naming and design philosophy, but solve different problems.
 
 | | Dashora | Rackora |
 | --- | --- | --- |
-| Primary job | Personal information dashboard | Infrastructure inventory and operations |
-| Mental model | “What do I need to see today?” | “What is in my racks, network, and lab?” |
-| Core objects | Pages, widgets, layout, credentials | Rooms, racks, devices, ports, cables, IPAM |
-| Interaction | Glanceable cards and feeds on a grid | Structured inventory, topology, and ops workflows |
-
-They may share engineering taste (TypeScript, Fastify, React, SQLite, self-hosting) and the `-ora` naming family, but they are separate products with separate repositories and release cycles. Dashora is not a rack inventory tool.
+| **Purpose** | Personal information dashboard | Proxmox and homelab control center |
+| **Main content** | Feeds, weather, calendars, media, markets, bookmarks, tasks | Nodes, VM/LXC status, Docker containers, storage, temperatures, uptime |
+| **Daily question** | “What do I want to see today?” | “How is my infrastructure doing?” |
+| **Interaction** | Browse and organize information | Monitor and manage infrastructure |
 
 ---
 
-## Quick Docker Compose install
+## Quick start
 
-**Requirements:** Docker and Docker Compose.
+### Requirements
+
+- Docker Engine
+- Docker Compose plugin
+- Approximately 512 MB RAM for a personal deployment
+- A few hundred MB of disk space plus your SQLite data
+
+### Recommended: published GHCR image
+
+Clone the repository so Compose can use the included nginx configuration:
 
 ```bash
 git clone https://github.com/GitTheums/Dashora.git
 cd Dashora
-docker compose up --build
 ```
+
+Create a small registry override:
+
+```bash
+cat > compose.ghcr.yaml <<'YAML'
+services:
+  dashora:
+    image: ghcr.io/gittheums/dashora:1.0.0
+    pull_policy: always
+
+  assets:
+    image: ghcr.io/gittheums/dashora:1.0.0
+    pull_policy: always
+YAML
+```
+
+Start Dashora:
+
+```bash
+docker compose -f compose.yaml -f compose.ghcr.yaml up -d
+```
+
+Open:
 
 | URL | Purpose |
 | --- | --- |
-| http://localhost:8080 | Web UI + API (via nginx) |
-| http://localhost:3000/api/v1/health | API health check |
+| `http://localhost:8080` | Dashora web interface and API through nginx |
+| `http://localhost:3000/api/v1/health` | Direct API health endpoint |
 
-Published multi-arch images (`linux/amd64`, `linux/arm64`):
+For a production deployment, pin an exact image version rather than relying on `latest`.
 
-```bash
-docker pull ghcr.io/gittheums/dashora:1.0.0
-```
-
-Useful overrides:
+### Build from source
 
 ```bash
-# Timezone (IANA name)
-TZ=Europe/Berlin docker compose up --build
-
-# Persist data on the host instead of a named volume
-DASHORA_DATA_BIND=./data docker compose up --build
-
-# Different host ports
-DASHORA_HOST_PORT=3001 DASHORA_HTTP_PORT=8081 docker compose up --build
-```
-
-For production, set a public URL and a secrets encryption key (see [Configuration](./docs/configuration.md)):
-
-```bash
-export DASHORA_PUBLIC_URL=https://dashora.example.com
-export SECRETS_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+git clone https://github.com/GitTheums/Dashora.git
+cd Dashora
 docker compose up --build -d
 ```
 
-Full guide: [Installation](./docs/installation.md).
+### Useful commands
+
+```bash
+# Container status
+docker compose -f compose.yaml -f compose.ghcr.yaml ps
+
+# Follow application logs
+docker compose -f compose.yaml -f compose.ghcr.yaml logs -f dashora
+
+# Find the first-run setup URL
+docker compose -f compose.yaml -f compose.ghcr.yaml logs dashora | grep -i setup
+
+# Stop the stack without deleting persistent data
+docker compose -f compose.yaml -f compose.ghcr.yaml down
+```
+
+Full installation instructions: [`docs/installation.md`](docs/installation.md).
 
 ---
 
 ## First-run setup
 
-On the first start with an empty database, Dashora logs a one-time setup URL:
+A new Dashora installation does not create a default administrator account.
+
+On the first start, Dashora generates a single-use setup token and writes a setup URL to the application logs:
 
 ```text
 Dashora first-run setup required. Open: http://localhost:8080/setup?token=...
 ```
 
-1. Open the URL from the container logs (`docker compose logs dashora`).
-2. Create the operator account (email, display name, password — minimum 12 characters).
-3. Sign in and add widgets from the library.
+1. Read the URL from the logs.
+2. Open it in a trusted browser on the same network.
+3. Create the operator account.
+4. Sign in and build your first page.
 
-The setup token is single-use, time-limited (default 24 hours), and rate-limited. After setup completes, the `/setup` flow is disabled.
-
-Details: [Installation — first-run setup](./docs/installation.md#first-run-setup).
+The token is stored only as a hash, expires automatically, is rate-limited, and becomes invalid after successful setup.
 
 ---
 
 ## Configuration
 
-Dashora is configured primarily through environment variables. In Compose, common values are `DASHORA_PUBLIC_URL`, `TZ`, `TRUST_PROXY`, and `SECRETS_ENCRYPTION_KEY` / `SECRETS_ENCRYPTION_KEY_FILE`.
+Dashora is primarily configured through environment variables and the in-app Settings area.
 
 | Variable | Purpose |
 | --- | --- |
-| `DASHORA_DATA_DIR` | SQLite and durable files (default `/data` in Docker) |
-| `CORS_ORIGIN` / `PUBLIC_BASE_URL` | Browser origin / setup URL base |
-| `SECRETS_ENCRYPTION_KEY` | 64-hex-char key for encrypting integration secrets |
-| `GITHUB_TOKEN`, `REDDIT_*`, `TWITCH_*`, … | Optional provider credentials (server-only) |
+| `DASHORA_DATA_DIR` | SQLite database and durable application files |
+| `DASHORA_PUBLIC_URL` | Public origin used by the Compose stack |
+| `CORS_ORIGIN` | Allowed browser origin for direct API deployments |
+| `PUBLIC_BASE_URL` | Base URL used when generating setup links |
+| `TRUST_PROXY` | Trusted reverse-proxy configuration |
+| `COOKIE_SECURE` | Secure-cookie behavior behind HTTPS |
+| `SECRETS_ENCRYPTION_KEY` | 64-character hexadecimal key used to encrypt stored integration secrets |
+| `SECRETS_ENCRYPTION_KEY_FILE` | File-based alternative for Docker or Podman secrets |
+| `GITHUB_TOKEN` | Optional GitHub token for higher limits and private repositories |
+| `COINGECKO_API_KEY` | Optional CoinGecko provider key |
+| `FINNHUB_API_KEY` | Optional Finnhub provider key |
+| `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | Reddit application credentials |
+| `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` | Twitch Helix credentials |
+| `TZ` | Container timezone using an IANA timezone name |
 
-Never put provider tokens in the web app or client bundle.
+Never commit `.env` files, provider tokens, session secrets, or encryption keys.
 
-Full reference: [Configuration](./docs/configuration.md).
+Complete reference: [`docs/configuration.md`](docs/configuration.md).
 
 ---
 
-## Supported widgets
+## Persistent storage
 
-| Widget | Notes |
+Dashora stores persistent application data under `/data` inside the application container.
+
+| Location | Path |
 | --- | --- |
-| Search | Configurable engines and quick links |
-| Clock | Local / secondary timezones |
-| Bookmarks | Grouped links |
-| Todo | Persistent tasks in SQLite |
-| Weather | Open-Meteo (no API key) |
-| RSS | Multiple feeds with failure isolation |
-| Calendar | ICS/iCal feeds (optional basic auth) |
-| GitHub Repository / Releases | Optional PAT for private repos / higher limits |
-| Markets | CoinGecko + Finnhub adapters |
-| Hacker News / Lobsters / Reddit | News feeds (Reddit needs app credentials) |
-| YouTube | Channel uploads via Atom feeds |
-| Twitch | Live status via Helix |
-| Custom API | Server-side JSON → fixed presentation model |
-| iFrame | Sandboxed https embeds |
+| Container data directory | `/data` |
+| SQLite database | `/data/dashora.sqlite` |
+| Default Compose storage | Named volume `dashora-data` |
+| Runtime user | UID `10001` |
 
-Catalog details: [Supported widgets](./docs/widgets/index.md).
-
----
-
-## Updates
+To use a host bind mount:
 
 ```bash
-# Backup first — see docs/backup-restore.md
-export DASHORA_IMAGE_TAG=1.0.0
-docker pull "ghcr.io/gittheums/dashora:${DASHORA_IMAGE_TAG}"
-docker tag "ghcr.io/gittheums/dashora:${DASHORA_IMAGE_TAG}" "dashora:${DASHORA_IMAGE_TAG}"
-# or: docker compose build dashora
-docker compose up -d
-curl -fsS http://localhost:3000/api/v1/health
+mkdir -p data
+sudo chown -R 10001:10001 data
+
+DASHORA_DATA_BIND=./data \
+docker compose -f compose.yaml -f compose.ghcr.yaml up -d
 ```
 
-Migrations run automatically on startup. Prefer pinned GHCR tags (`ghcr.io/gittheums/dashora:1.0.0`) in production.
+Replacing or updating the container does not remove the database as long as the volume or bind-mounted data directory remains intact.
 
-Guide: [Upgrading](./docs/upgrading.md).
-
----
-
-## Backups
-
-Two complementary approaches:
-
-1. **Config export** (Settings → Backup) — JSON export/import of dashboards, widgets, todos, integrations metadata, and appearance.
-2. **Volume / SQLite backup** — Full disaster recovery of `$DASHORA_DATA_DIR` (including `dashora.sqlite`). Also back up `SECRETS_ENCRYPTION_KEY`; without it, stored secrets cannot be decrypted.
-
-Guide: [Backup and restore](./docs/backup-restore.md).
+> Deleting the persistent data directory permanently deletes dashboards, tasks, settings, and stored integration metadata.
 
 ---
 
-## Reverse proxy
+## Backup and restore
 
-The bundled Compose stack already includes nginx on port 8080. For an external proxy (Caddy, Traefik, another nginx), terminate TLS in front of Dashora, forward `/api/` to the API, serve the SPA (or proxy to the bundled proxy), and set:
+Dashora supports two complementary backup methods.
 
-- `DASHORA_PUBLIC_URL` / `CORS_ORIGIN` / `PUBLIC_BASE_URL` to your https origin
-- `TRUST_PROXY=true` only when the proxy strips client-supplied `X-Forwarded-*` headers
-- `COOKIE_SECURE=true` (or `auto` in production) behind HTTPS
+### Configuration export
 
-Guide: [Reverse proxy](./docs/reverse-proxy.md).
+Use **Settings → Backup** to export a versioned JSON file containing supported dashboard configuration.
+
+This is the easiest method for portability between installations.
+
+### Full data backup
+
+For complete disaster recovery, back up:
+
+- the full Dashora data volume or bind-mounted `/data` directory;
+- the secrets encryption key used by the installation.
+
+The encryption key is required to decrypt stored provider secrets after a restore.
+
+See [`docs/backup-restore.md`](docs/backup-restore.md) before moving or upgrading a production installation.
 
 ---
 
-## Security warning
+## Updating
 
-Dashora is self-hosted software that often sits next to powerful credentials. **Treat it as a trusted-operator tool, not a hardened multi-tenant SaaS.**
+Back up the data directory and encryption key first.
 
-- Expose it only on a private network or behind authentication and TLS you control.
-- Set `SECRETS_ENCRYPTION_KEY` (or `*_FILE`) before storing integration secrets.
-- Never commit `.env` files, encryption keys, or provider tokens.
-- Read [SECURITY.md](./SECURITY.md) and [docs/security-model.md](./docs/security-model.md) before internet exposure.
+```bash
+cd Dashora
 
-Known limitations today include no MFA, no password-reset flow, and a single-operator model. See SECURITY.md for the full list of accepted risks.
+docker compose -f compose.yaml -f compose.ghcr.yaml pull
+docker compose -f compose.yaml -f compose.ghcr.yaml up -d
+docker compose -f compose.yaml -f compose.ghcr.yaml ps
+```
+
+Production installations should use a pinned image tag:
+
+```yaml
+image: ghcr.io/gittheums/dashora:1.0.0
+```
+
+To roll back, change the tag to the previous known-good version and recreate the stack.
+
+See [`docs/upgrading.md`](docs/upgrading.md).
+
+---
+
+## Reverse proxy and remote access
+
+The included Compose stack serves Dashora through nginx on port `8080`.
+
+For remote access:
+
+- terminate TLS through nginx, Caddy, Traefik, or another trusted reverse proxy;
+- set the public origin and cookie settings correctly;
+- configure `TRUST_PROXY` only when forwarded headers are controlled by your proxy;
+- never expose integration credentials in client-side configuration;
+- prefer a VPN or authenticated reverse proxy for private deployments.
+
+See [`docs/reverse-proxy.md`](docs/reverse-proxy.md).
+
+---
+
+## Security
+
+Dashora is designed as a trusted single-operator self-hosted application—not as a hardened public multi-tenant SaaS.
+
+Implemented protections include:
+
+- Argon2id password hashing;
+- opaque server-side sessions;
+- HttpOnly and SameSite cookies;
+- CSRF protection;
+- rate limiting on authentication and setup routes;
+- encrypted integration secrets;
+- server-side provider requests;
+- restricted Custom API mapping;
+- sandboxed iFrames;
+- URL validation and SSRF-aware request controls;
+- non-root Docker runtime;
+- read-only application filesystem.
+
+Before exposing Dashora outside your local network, read:
+
+- [`SECURITY.md`](SECURITY.md)
+- [`docs/security-model.md`](docs/security-model.md)
+- [`docs/security-checklist.md`](docs/security-checklist.md)
+
+Security issues should be reported privately according to [`SECURITY.md`](SECURITY.md), not through a public issue.
+
+---
+
+## Technology
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React, Vite, TypeScript |
+| API | Fastify, Node.js |
+| Database | SQLite with Drizzle ORM |
+| Validation | Zod |
+| Data fetching | TanStack Query and server-side provider adapters |
+| State | Zustand |
+| Layout | React Grid Layout |
+| Styling | Tailwind CSS and shared semantic design tokens |
+| Testing | Vitest, React Testing Library, Playwright |
+| Packaging | pnpm workspace, Docker Buildx, nginx |
+| CI/CD | GitHub Actions and GitHub Container Registry |
 
 ---
 
 ## Development
 
+Requirements:
+
+- Node.js 22 or newer
+- pnpm 11 or newer
+
 ```bash
+git clone https://github.com/GitTheums/Dashora.git
+cd Dashora
+
 pnpm install
 pnpm dev
 ```
 
-| App | URL |
+| Service | URL |
 | --- | --- |
-| Web | http://localhost:5173 |
-| API | http://localhost:3000 |
+| Web development server | `http://localhost:5173` |
+| API | `http://localhost:3000` |
+
+### Quality commands
 
 ```bash
-pnpm lint && pnpm typecheck && pnpm test && pnpm build
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:coverage
+pnpm test:e2e
+pnpm build
+pnpm test:container
 ```
 
-Guide: [Development](./docs/development.md). Widget authors: [Widget development](./docs/widget-development.md).
+### Project structure
+
+```text
+Dashora/
+├── apps/
+│   ├── web/                  # React frontend
+│   └── server/               # Fastify API and SQLite ownership
+├── packages/
+│   ├── shared/               # Shared schemas and types
+│   ├── ui/                   # Shared interface primitives
+│   └── widget-sdk/           # Widget contracts and first-party widgets
+├── docs/                     # Operator and contributor documentation
+├── infra/                    # Dockerfile, nginx, and deployment notes
+├── scripts/                  # Repository automation and smoke tests
+├── compose.yaml              # Production-style local stack
+└── compose.dev.yaml          # Development stack
+```
+
+---
+
+## Documentation
+
+| Guide | Description |
+| --- | --- |
+| [Installation](docs/installation.md) | Docker deployment and first-run setup |
+| [Configuration](docs/configuration.md) | Environment variables and provider credentials |
+| [Supported widgets](docs/widgets/index.md) | First-party widget catalog |
+| [Backup and restore](docs/backup-restore.md) | Configuration and SQLite backups |
+| [Upgrading](docs/upgrading.md) | Updating and rolling back |
+| [Reverse proxy](docs/reverse-proxy.md) | TLS and proxy configuration |
+| [Troubleshooting](docs/troubleshooting.md) | Common problems and diagnostics |
+| [Development](docs/development.md) | Local development workflow |
+| [Widget development](docs/widget-development.md) | Adding a first-party widget |
+| [Architecture](docs/architecture.md) | System design and ownership boundaries |
+| [Security model](docs/security-model.md) | Authentication, secrets, SSRF, and trust model |
+| [Roadmap](docs/roadmap.md) | Planned direction and non-goals |
 
 ---
 
 ## Roadmap
 
-- **v1.0** — Shipped: single-operator personal dashboard (auth, layout, first-party widgets, secrets, caching, Compose + GHCR packaging).
-- **v1.x** — More widgets, optional OIDC / proxy-auth docs, backup polish, further hardening.
-- **v2** — Deliberate extensibility only after an ADR revisits the plugin policy (no arbitrary remote JS plugins).
+Dashora 1.0 establishes the core self-hosted dashboard:
 
-Details: [Roadmap](./docs/roadmap.md). Release process: [Release checklist](./docs/release-checklist.md).
+- local authentication;
+- persistent pages and layouts;
+- responsive drag-and-drop editing;
+- first-party widget catalog;
+- themes and custom branding;
+- import/export;
+- Docker and GHCR distribution.
+
+Future releases may expand the widget catalog, authentication options, backup tooling, and integrations while keeping the product focused and local-first.
+
+See [`docs/roadmap.md`](docs/roadmap.md) for the maintained roadmap.
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CONDUCT.md).
+Bug reports, documentation improvements, and thoughtful feature proposals are welcome.
 
-1. Open an issue or draft PR describing the change.
-2. Keep Dashora original — do not copy Glance or other dashboard source, templates, assets, naming, CSS, or docs.
-3. Follow the engineering rules in [AGENTS.md](./AGENTS.md): TypeScript strict mode, Zod validation, tests for new API routes, light/dark UI, accessible controls.
-4. Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` before requesting review.
-5. New widgets are first-party TypeScript modules in this repo — see [Widget development](./docs/widget-development.md).
+Before opening a pull request:
 
-Architecture and ADRs live under [`docs/`](./docs/README.md). Changelog: [CHANGELOG.md](./CHANGELOG.md).
+1. Read [`CONTRIBUTING.md`](CONTRIBUTING.md).
+2. Follow the engineering rules in [`AGENTS.md`](AGENTS.md).
+3. Keep Dashora an original implementation.
+4. Add tests for functional changes.
+5. Run the complete relevant quality checks.
+
+For large features or architectural changes, open an issue first so the approach can be discussed.
+
+---
+
+## Inspiration and originality
+
+Dashora was inspired by the broader self-hosted dashboard ecosystem, including [Glance](https://github.com/glanceapp/glance).
+
+Dashora is an independent product and codebase. It does not copy Glance source code, templates, assets, CSS, naming, or documentation, and does not depend on Glance as a library.
 
 ---
 
 ## License
 
-Apache-2.0 — see [LICENSE](./LICENSE).
+Dashora is licensed under the [Apache License 2.0](LICENSE).
 
 ---
 
-## Acknowledgements
+<p align="center">
+  <strong>Your home. Your data. Your way.</strong>
+</p>
 
-- **[Glance](https://github.com/glanceapp/glance)** — Product inspiration for the self-hosted personal dashboard *category*. Dashora is not a fork, skin, or derivative of Glance, and does not depend on Glance as a library or codebase.
-- The broader self-hosted community for patterns around Docker packaging, reverse proxies, and operator-owned data.
-- Contributors and early operators who file issues, improve docs, and add first-party widgets.
+<p align="center">
+  <a href="https://github.com/GitTheums/Dashora">Repository</a>
+  ·
+  <a href="https://github.com/GitTheums/Dashora/releases">Releases</a>
+  ·
+  <a href="https://github.com/GitTheums/Dashora/issues">Issues</a>
+  ·
+  <a href="https://github.com/GitTheums/Dashora/blob/main/SECURITY.md">Security</a>
+</p>
