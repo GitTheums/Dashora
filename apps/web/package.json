@@ -31,7 +31,7 @@
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^26.0.0",
-    "rollup-plugin-visualizer": "^6.0.3",
+    "rollup-plugin-visualizer": "^7.0.1",
     "typescript": "^5.8.2",
     "vite": "^6.2.2",
     "vite-plugin-compression2": "^1.4.0",
